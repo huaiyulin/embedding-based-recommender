@@ -90,7 +90,7 @@ class UserModel:
     def buildMany2OneFunctionalModel(self, shape):
         input_pos = Input(shape=(shape[1],shape[2],), name="input_pos")
         input_neg = Input(shape=(shape[1],shape[2],), name="input_neg")
-        gru = GRU(output_dim=shape[2], input_length=shape[1], input_dim=shape[2], name="gru")(input_pos)
+        gru = GRU(units=shape[2], input_shape=(shape[1],shape[2]), name="gru")(input_pos)
         user_vec = Dense(shape[2], name="user_vec")(gru)
         user_vec_d3    = Lambda(lambda x: K.expand_dims(x, axis=1), name = "user_vec_3d")(user_vec)
         batch_cos_pos_3d  = Lambda(self.pairwise_cos_sim, name="batch_cos_pos_3d")([input_pos,user_vec_d3])
