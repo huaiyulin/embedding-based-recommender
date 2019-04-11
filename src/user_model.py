@@ -11,19 +11,6 @@ from keras.callbacks import EarlyStopping, ModelCheckpoint
 import os
 import logging
 
-
-##### Training Process
-# data_source_dir = '../data'
-# output_temp_dir = os.path.join(data_source_dir,'mid-product')
-# user_to_news_pos_vec_path = os.path.join(output_temp_dir, 'user_to_news_pos_vec.pkl')
-# user_to_news_neg_vec_path = os.path.join(output_temp_dir, 'user_to_news_neg_vec.pkl')
-# user_vec_path = os.path.join(data_source_dir,'user_vec.pkl')
-
-# user_model = UserModel()
-# user_model.load_news_history(user_to_news_pos_vec_path, user_to_news_neg_vec_path)
-# user_model.model_training()
-# user_model.save_to(user_vec_path)
-
 class UserModel:
     """
 
@@ -39,13 +26,19 @@ class UserModel:
         self.user_to_vec = None
 
     def load_news_history(self, pos_path, neg_path):
+        self.logging.info('loading reading history...')
         with open(pos_path, 'rb') as fp:
             self.user_to_news_pos_vec = pickle.load(fp)
         with open(neg_path, 'rb') as fp:
             self.user_to_news_neg_vec = pickle.load(fp)
+        self.logging.info('- users: {}'.format(len(self.user_to_news_neg_vec)))
+        self.logging.info('- complete loading reading history...')
+
+    def buildNewsTrain(self, N=10):
+        self.logging.info('building user-vectors...')
+        self.logging.info('- news-threshold: {}'.format(N))
 
 
-    def buildNewsTrain(self):
         X_pos, X_neg = [], []
         user_list = []
         for i,user_id in enumerate(self.user_to_news_pos_vec): 
@@ -53,8 +46,11 @@ class UserModel:
             neg_list = self.user_to_news_neg_vec[user_id]
             if len(pos_list) >= 10 and len(neg_list) >= 10:
                 user_list.append(user_id)
-                X_pos.append(pos_list[0:9])
-                X_neg.append(neg_list[0:9])
+                X_pos.append(pos_list[0:10])
+                X_neg.append(neg_list[0:10])
+        self.logging.info('- qualified users: {}'.format(len(user_list)))
+        self.logging.info('- complete building user-vectors')
+
         return user_list,X_pos,X_neg
 
     def cos_sim(self, a, b):
@@ -106,9 +102,9 @@ class UserModel:
         model.compile(loss='mse', optimizer="adam")
         return model
 
-    def model_training(self):
+    def model_training(self, N=10):
         # 1. 讀入 positive 和 negative 的資料
-        user_list, X_pos, X_neg = self.buildNewsTrain()
+        user_list, X_pos, X_neg = self.buildNewsTrain(N=N)
         X_pos = np.asarray(X_pos)
         X_neg = np.asarray(X_neg)
         X_train = [X_pos,X_neg]
@@ -129,5 +125,8 @@ class UserModel:
         self.user_to_vec = user_dic
 
     def save_to(self, path):
+        self.logging.info('saving user-vectors...')
         with open(path, 'wb') as fp:
             pickle.dump(self.user_to_vec,fp)
+        self.logging.info('- complete saving user-vectors to "{}"'.format(path))
+
