@@ -11,13 +11,25 @@ from keras.callbacks import EarlyStopping, ModelCheckpoint
 import os
 import logging
 
+data_source_dir = '../data'
+
 class UserModel:
     """
 
     Args: Temporary
 
     """
-    def __init__(self):
+    def __init__(self, dir='../data', name=None):
+        if not name:
+            name = time.asctime(time.localtime(time.time()))
+        self.name = name
+        self.config = {}
+        self.config['output_dir'] = os.path.join(dir, name)
+        self.config['user_to_news_pos_vec_path'] = os.path.join(self.config['output_dir'], 'user_to_news_pos_vec.pkl')
+        self.config['user_to_news_neg_vec_path'] = os.path.join(self.config['output_dir'], 'user_to_news_neg_vec.pkl')
+        self.config['user_model_path'] = os.path.join(self.config['output_dir'], 'user_model.pkl')
+        self.config['user_vec_pool_path'] = os.path.join(self.config['output_dir'], 'user_vec_pool.pkl')
+
         self.logging = logging.getLogger(name=__name__)
         self.predict_model = None
         self.user_to_news_history  = None
@@ -25,7 +37,12 @@ class UserModel:
         self.user_to_news_neg_vec  = None
         self.user_to_vec = None
 
-    def load_news_history(self, pos_path, neg_path):
+    def load_news_history(self, pos_path=None, neg_path=None):
+        if not pos_path:
+            pos_path=self.config['user_to_news_pos_vec_path']
+        if not neg_path:
+            neg_path=self.config['user_to_news_neg_vec_path']
+        
         self.logging.info('loading reading history...')
         with open(pos_path, 'rb') as fp:
             self.user_to_news_pos_vec = pickle.load(fp)
@@ -124,9 +141,15 @@ class UserModel:
             user_dic[user_list[i]] = user_vec_output[i]
         self.user_to_vec = user_dic
 
-    def save_to(self, path):
+    def save_user_vec_pool(self):
         self.logging.info('saving user-vectors...')
-        with open(path, 'wb') as fp:
+        with open(self.config['user_vec_pool_path'], 'wb') as fp:
             pickle.dump(self.user_to_vec,fp)
         self.logging.info('- complete saving user-vectors to "{}"'.format(path))
+
+    def save_user_model(self):
+        self.logging.info('saving user-model...')
+        with open(self.config['user_model_path'], 'wb') as fp:
+            pickle.dump(self.predict_model,fp)
+        self.logging.info('- complete saving user-model to "{}"'.format(path))
 

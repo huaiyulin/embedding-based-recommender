@@ -7,9 +7,6 @@ import os
 import logging
 import time
 
-
-data_source_dir = '../data'
-
 # datasource config
 event_time = 'event_timestamp'
 news_id    = 'page.item.id'
@@ -21,29 +18,29 @@ class Preprocessor:
     Args: Temporary
 
     """
-    def __init__(self, name=None):
-        self.model_name = name
-        self.logging = logging.getLogger(name=__name__)
-        self.events_for_training = None
-        self.events_for_candidates = None
-        self.candidates_pool = None
-        self.user_to_news_history = None
-        self.news_dict = None
+    def __init__(self, dir='../data', name=None):
+        if not name:
+            name = time.asctime(time.localtime(time.time()))
+        self.name = name
         self.config = {}
-        if name:
-            self.config['output_dir'] = os.path.join(data_source_dir, 'mid-product-'+name)
-        else:
-            localtime = time.asctime(time.localtime(time.time()))
-            self.config['output_dir'] = os.path.join(data_source_dir, 'mid-product-'+localtime)
-        if not os.path.exists(self.config['output_dir']):
-            os.makedirs(self.config['output_dir'])
+        self.config['output_dir'] = os.path.join(dir, name)
         self.config['user_to_news_list_path']    = os.path.join(self.config['output_dir'], 'user_to_news_list.pkl')
         self.config['candidates_pool_path']      = os.path.join(self.config['output_dir'], 'candidates_pool.pkl')
         self.config['user_to_news_pos_vec_path'] = os.path.join(self.config['output_dir'], 'user_to_news_pos_vec.pkl')
         self.config['user_to_news_neg_vec_path'] = os.path.join(self.config['output_dir'], 'user_to_news_neg_vec.pkl')
 
-    def load_news_dict(self, news_dic_pah):
-        self.news_dict = pd.read_pickle(news_dic_pah)
+        if not os.path.exists(self.config['output_dir']):
+            os.makedirs(self.config['output_dir'])
+
+        self.logging = logging.getLogger(name=__name__)
+        self.events_for_training = None
+        self.events_for_candidates = None
+        self.candidates_pool = None
+        self.user_to_news_history = None
+        self.news_vec_pool = None
+        
+    def load_news_vec_pool(self, news_vec_pool_path):
+        self.news_vec_pool = pd.read_pickle(news_vec_pool_path)
 
     def load_datas_for_user_model(self, news_paths):
         logging.info('loading {} days events for model training...'.format(len(news_paths)))
@@ -94,7 +91,7 @@ class Preprocessor:
         return self.candidates_pool
 
     def news_ids_to_vecs(self, news_list,items=-1):
-        news_vecs = np.asarray([self.news_dict[x] for x in news_list if x in self.news_dict])
+        news_vecs = np.asarray([self.news_vec_pool[x] for x in news_list if x in self.news_vec_pool])
         if items != -1:
             news_vecs = news_vecs[:items]
         return news_vecs
@@ -120,6 +117,3 @@ class Preprocessor:
         with open(self.config['user_to_news_neg_vec_path'], 'wb') as fp:
             pickle.dump(user_to_news_neg_vec,fp)
         logging.info('complete saving user_to_news_neg_vec.')
-
-        return user_to_news_pos_vec, user_to_news_neg_vec
-
