@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import pickle
-from keras.models import Model
+from keras.models import Model, load_model
 from keras.layers import Dense, Dropout, Activation, Flatten, LSTM, GRU
 from keras.layers import TimeDistributed, RepeatVector, Input, subtract, Lambda
 from keras import backend as K
@@ -134,22 +134,34 @@ class UserModel:
         layer_name = 'user_vec'
         user_vec_model = Model(inputs=model.input, outputs=model.get_layer(layer_name).output)
         self.predict_model = user_vec_model
-        user_vec_output = self.predict_model.predict([X_pos, X_neg])
+        self.save_user_model()
+        self.load_user_model()
+        user_vec_output = self.predict_model.predict([X_pos])
         # 將訓練得到的 user_vec 存起來
         user_dic = {}
         for i in range(len(user_vec_output)):
             user_dic[user_list[i]] = user_vec_output[i]
         self.user_to_vec = user_dic
+        self.save_user_vec_pool()
 
-    def save_user_vec_pool(self):
+    def save_user_vec_pool(self, path=None):
         self.logging.info('saving user-vectors...')
-        with open(self.config['user_vec_pool_path'], 'wb') as fp:
+        if not path:
+            path = self.config['user_vec_pool_path']
+        with open(path, 'wb') as fp:
             pickle.dump(self.user_to_vec,fp)
         self.logging.info('- complete saving user-vectors to "{}"'.format(path))
 
-    def save_user_model(self):
+    def save_user_model(self, path=None):
         self.logging.info('saving user-model...')
-        with open(self.config['user_model_path'], 'wb') as fp:
-            pickle.dump(self.predict_model,fp)
+        if not path:
+            path = self.config['user_model_path']
+        self.predict_model.save(path)
         self.logging.info('- complete saving user-model to "{}"'.format(path))
 
+    def load_user_model(self, path=None):
+        self.logging.info('loading user-model...')
+        if not path:
+            path = self.config['user_model_path']
+        self.predict_model = load_model(path)
+        self.logging.info('- complete loading user-model from "{}"'.format(path))
