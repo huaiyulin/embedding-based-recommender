@@ -84,7 +84,7 @@ class Preprocessor:
         news_count = df.groupby(news_id).size().reset_index().sort_values([0],ascending = False).reset_index()
         self.candidates_pool = news_count[(news_count.index < top) + (news_count[0] > at_least).values][news_id].tolist()
         logging.info('saving candidates_pool...')
-
+        self.candidates_pool = {c_id:self.news_vec_pool[c_id] for c_id in self.candidates_pool if c_id in self.news_vec_pool}
         with open(self.config['candidates_pool_path'], 'wb') as fp:
             pickle.dump(self.candidates_pool,fp)
         logging.info('complete saving candidates_pool.')
