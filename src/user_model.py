@@ -51,20 +51,22 @@ class UserModel:
         self.logging.info('- users: {}'.format(len(self.user_to_news_neg_vec)))
         self.logging.info('- complete loading reading history...')
 
-    def buildNewsTrain(self, N=10):
+    def buildNewsTrain(self, start=0, items=10, N=None):
         self.logging.info('building user-vectors...')
         self.logging.info('- news-threshold: {}'.format(N))
 
+        if not N:
+            N = start + items
 
         X_pos, X_neg = [], []
         user_list = []
         for i,user_id in enumerate(self.user_to_news_pos_vec): 
             pos_list = self.user_to_news_pos_vec[user_id]
             neg_list = self.user_to_news_neg_vec[user_id]
-            if len(pos_list) >= 10 and len(neg_list) >= 10:
+            if len(pos_list) >= N and len(neg_list) >= N:
                 user_list.append(user_id)
-                X_pos.append(pos_list[0:10])
-                X_neg.append(neg_list[0:10])
+                X_pos.append(pos_list[start:start+items])
+                X_neg.append(neg_list[start:start+items])
         self.logging.info('- qualified users: {}'.format(len(user_list)))
         self.logging.info('- complete building user-vectors')
 
@@ -119,9 +121,9 @@ class UserModel:
         model.compile(loss='mse', optimizer="adam")
         return model
 
-    def model_training(self, N=10):
+    def model_training(self, start=0, items=10, N=None):
         # 1. 讀入 positive 和 negative 的資料
-        user_list, X_pos, X_neg = self.buildNewsTrain(N=N)
+        user_list, X_pos, X_neg = self.buildNewsTrain(start=start, items=items, N=N)
         X_pos = np.asarray(X_pos)
         X_neg = np.asarray(X_neg)
         X_train = [X_pos,X_neg]
@@ -165,3 +167,10 @@ class UserModel:
             path = self.config['user_model_path']
         self.predict_model = load_model(path)
         self.logging.info('- complete loading user-model from "{}"'.format(path))
+
+    def build_user_vec(self, news_vecs):
+        self.logging.info('building user-vec...')
+        news_vecs = np.asarray(news_vecs)
+        user_vec_output = self.predict_model.predict([news_vecs])
+        self.logging.info('- complete building user-vec...')
+        return user_vec_output

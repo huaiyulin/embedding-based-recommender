@@ -110,7 +110,7 @@ class Recommender:
     def get_ranking_list_by_user_id(self, user_id, realtime=False, items=20):
         logging.info('=== Getting === ranking_list by user_id...')
         ranking_list = None
-        if user_id not in self.user_vec_pool[user_id]:
+        if user_id not in self.user_vec_pool:
             logging.info('- user_id not in user_pool')
             return []
         if realtime == True:
@@ -125,8 +125,8 @@ class Recommender:
     def get_ranking_list_by_news_id(self, news_id, realtime=False, items=20):
         logging.info('=== Getting === ranking_list by news_id...')
         ranking_list = None
-        if news_id not in self.news_vec_pool[news_id]:
-            logging.info('- news_id not in user_pool')
+        if news_id not in self.news_vec_pool:
+            logging.info('- news_id not in news_pool')
             return []
         if realtime == True:
             c_ids, c_vecs = zip(*self.candidates_pool.items())

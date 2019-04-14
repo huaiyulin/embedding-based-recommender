@@ -36,8 +36,11 @@ class Preprocessor:
         self.events_for_training = None
         self.events_for_candidates = None
         self.candidates_pool = None
+        self.sampling_pool = None
         self.user_to_news_history = None
         self.news_vec_pool = None
+        self.user_to_news_pos_vec  = None
+        self.user_to_news_neg_vec  = None
         
     def load_news_vec_pool(self, news_vec_pool_path):
         self.news_vec_pool = pd.read_pickle(news_vec_pool_path)
@@ -90,6 +93,13 @@ class Preprocessor:
         logging.info('complete saving candidates_pool.')
         return self.candidates_pool
 
+    def build_sampling_pool(self, top = 5000, at_least = 10):
+        logging.info('=== BUILDING === sampling_pool...')
+        df = self.clean_data(self.events_for_training)
+        news_count = df.groupby(news_id).size().reset_index().sort_values([0],ascending = False).reset_index()
+        self.sampling_pool = news_count[(news_count.index < top) + (news_count[0] > at_least).values][news_id].tolist()
+        logging.info('complete building sampling_pool.')
+
     def news_ids_to_vecs(self, news_list,items=-1):
         news_vecs = np.asarray([self.news_vec_pool[x] for x in news_list if x in self.news_vec_pool])
         if items != -1:
@@ -97,23 +107,30 @@ class Preprocessor:
         return news_vecs
 
     def get_neg_ids_by_pos_ids(self, pos_ids):
-        neg_ids = random.sample(self.candidates_pool, len(pos_ids)*2)
+        neg_ids = random.sample(self.sampling_pool, len(pos_ids)*2)
         neg_ids = [x for x in neg_ids if x not in pos_ids]
         return neg_ids
 
-    def build_vec_pairs_from_history(self):
+    def build_vec_pairs_from_history(self, limits=15):
         logging.info('=== BUILDING === user_news_vec_pairs...')
         user_to_news_pos_vec = {}
         user_to_news_neg_vec = {}
+        self.build_sampling_pool()
         for user_id, pos_ids in self.user_to_news_history.items():
+            if len(pos_ids) < limits:
+                continue
             neg_ids = self.get_neg_ids_by_pos_ids(pos_ids)
             pos_vecs = self.news_ids_to_vecs(pos_ids)
             neg_vecs = self.news_ids_to_vecs(neg_ids, items=len(pos_vecs))
             user_to_news_pos_vec[user_id] = pos_vecs
             user_to_news_neg_vec[user_id] = neg_vecs
+
+        self.user_to_news_pos_vec = user_to_news_pos_vec
+        self.user_to_news_neg_vec = user_to_news_neg_vec
+
         with open(self.config['user_to_news_pos_vec_path'], 'wb') as fp:
-            pickle.dump(user_to_news_pos_vec,fp)
+            pickle.dump(self.user_to_news_pos_vec,fp)
         logging.info('complete saving user_to_news_pos_vec.')
         with open(self.config['user_to_news_neg_vec_path'], 'wb') as fp:
-            pickle.dump(user_to_news_neg_vec,fp)
+            pickle.dump(self.user_to_news_neg_vec,fp)
         logging.info('complete saving user_to_news_neg_vec.')
