@@ -1,6 +1,7 @@
 import pandas as pd
 import pickle
 import logging
+from annoy import AnnoyIndex
 import numpy as np
 import random
 import os
@@ -27,6 +28,7 @@ class Recommender:
         self.config['news_vec_pool_path'] = os.path.join(self.config['output_dir'], 'news_vec_pool.pkl')
         self.config['user_ranking_list_path'] = os.path.join(self.config['output_dir'], 'user_ranking_list.pkl')
         self.config['news_ranking_list_path'] = os.path.join(self.config['output_dir'], 'news_ranking_list.pkl')
+        self.config['annoy_index_path'] = os.path.join(self.config['output_dir'], 'annoy_index.ann')
 
         self.logging = logging.getLogger(name=__name__)
         self.candidates_pool = None
@@ -34,6 +36,7 @@ class Recommender:
         self.news_vec_pool = None
         self.user_ranking_list = None
         self.news_ranking_list = None
+        self.annoy_indexer = None
 
     def load_vec_pool(self):
         self.candidates_pool = pd.read_pickle(self.config['candidates_pool_path'])
@@ -123,7 +126,6 @@ class Recommender:
         return list(c_ids)[:items]
 
     def get_ranking_list_by_news_id(self, news_id, realtime=False, items=20):
-        logging.info('=== Getting === ranking_list by news_id...')
         ranking_list = None
         if news_id not in self.news_vec_pool:
             logging.info('- news_id not in news_pool')
@@ -139,3 +141,33 @@ class Recommender:
 
     def add_news_vec_to_candidates_pool(self, news_id, update_pretrained_list=True):
         logging.info('=== ADDING === news_vec to candidates_pool...')
+
+    def build_annoy_indexer(self, trees=10, path=None):
+        if not path:
+            path = self.config['annoy_index_path']
+        vec_len = len(list(self.candidates_pool.values())[0])
+        t = AnnoyIndex(vec_len)  # Length of item vector that will be indexed
+        for i, v in self.candidates_pool.items():
+            t.add_item(int(i), v)
+        t.build(trees) # 10 trees
+        self.annoy_indexer = t
+        t.save(path)
+
+    def load_annoy_indexer(self, path=None):
+        if not path:
+            path = self.config['annoy_index_path']
+        vec_len = len(list(self.candidates_pool.values())[0])
+        t = AnnoyIndex(vec_len)
+        t.load(path)
+        self.annoy_indexer = t
+
+    def get_ranking_list_by_annoy(self, news_id=None,user_id=None,items=20):
+        t_vec = None
+        if (user_id != None) & (user_id in self.user_vec_pool):
+            t_vec = self.user_vec_pool[user_id]
+        elif (news_id != None) & (news_id in self.news_vec_pool):
+            t_vec = self.news_vec_pool[news_id]
+        else:
+            logging.info('user_id/news_id does not exist.')
+            return
+        return self.annoy_indexer.get_nns_by_vector(t_vec,items,include_distances=False)
