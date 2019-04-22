@@ -151,6 +151,39 @@ class UserModel:
             user_dic[user_list[i]] = user_vec_output[i]
         self.user_to_vec = user_dic
         self.save_user_vec_pool()
+    
+    def build_user_vec_by_averaging(self,dic,items=10):
+        self.logging.info('building user-vectors by averaging history')
+        user_vecs = []
+        user_list = []
+        for i,user_id in enumerate(dic): 
+            pos_list = dic[user_id]
+            if len(pos_list) >= items:
+                user_list.append(user_id)
+                user_vecs.append(np.asarray(pos_list[:items]).mean(0).tolist())
+        self.logging.info('- qualified users: {}'.format(len(user_list)))
+        user_dic = dict(zip(user_list,user_vecs))
+        self.logging.info('- complete building user-vectors by averaging')
+        return user_dic
+
+
+    def build_user_vec_by_pretrained_model(self,dic,items=10):
+        self.logging.info('building user-vectors from history')
+        X_pos = []
+        user_list = []
+        for i,user_id in enumerate(dic): 
+            pos_list = dic[user_id]
+            if len(pos_list) >= items:
+                user_list.append(user_id)
+                X_pos.append(pos_list[:items])
+        self.logging.info('- qualified users: {}'.format(len(user_list)))
+        X_pos = np.asarray(X_pos)
+        user_vec_output = self.predict_model.predict([X_pos])
+        user_dic = {}
+        for i in range(len(user_vec_output)):
+            user_dic[user_list[i]] = user_vec_output[i]
+        self.logging.info('- complete building user-vectors')
+        return user_dic
 
     def save_user_vec_pool(self, path=None):
         self.logging.info('saving user-vectors...')
