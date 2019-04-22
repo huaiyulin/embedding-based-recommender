@@ -108,12 +108,23 @@ class Preprocessor:
         neg_ids = [x for x in neg_ids if x not in pos_ids]
         return neg_ids
 
-    def build_vec_pairs_from_history(self, limits=15):
+    def build_pos_vec_from_history(self, at_least=10):
+        self.logging.info('building user_news_vec_pairs...')
+        user_to_news_pos_vec = {}
+        for user_id, pos_ids in self.user_to_news_history.items():
+            if len(pos_ids) < at_least:
+                continue
+            pos_vecs = self.news_ids_to_vecs(pos_ids)
+            user_to_news_pos_vec[user_id] = pos_vecs
+        self.logging.info('- complete building user_to_news_pos_vec.')
+        return user_to_news_pos_vec
+
+    def build_vec_pairs_from_history(self, at_least=10):
         self.logging.info('building user_news_vec_pairs...')
         user_to_news_pos_vec = {}
         user_to_news_neg_vec = {}
         for user_id, pos_ids in self.user_to_news_history.items():
-            if len(pos_ids) < limits:
+            if len(pos_ids) < at_least:
                 continue
             neg_ids = self._get_neg_ids_by_pos_ids(pos_ids)
             pos_vecs = self.news_ids_to_vecs(pos_ids)
