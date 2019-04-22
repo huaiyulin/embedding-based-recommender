@@ -110,7 +110,7 @@ class Recommender:
         norm_b = np.linalg.norm(b)
         return dot_product / (norm_a * norm_b)
 
-    def get_ranking_list_by_user_id(self, user_id, realtime=False, items=20):
+    def get_ranking_list_by_user_id(self, user_id, realtime=True, items=20):
         logging.info('=== Getting === ranking_list by user_id...')
         ranking_list = None
         if user_id not in self.user_vec_pool:
@@ -125,7 +125,7 @@ class Recommender:
             c_scores, c_ids = zip(*self.user_ranking_list[user_id])
         return list(c_ids)[:items]
 
-    def get_ranking_list_by_news_id(self, news_id, realtime=False, items=20):
+    def get_ranking_list_by_news_id(self, news_id, realtime=True, items=20):
         ranking_list = None
         if news_id not in self.news_vec_pool:
             logging.info('- news_id not in news_pool')
@@ -138,6 +138,25 @@ class Recommender:
         else:
             c_scores, c_ids = zip(*self.news_ranking_list[news_id])
         return list(c_ids)[:items]
+
+    def get_ranking_list_by_both(self,user_id,news_id, realtime=True, items=20):
+        ranking_list = None
+        r_list_n = self.get_ranking_list_by_news_id(news_id, realtime=realtime, items=items*2)
+        r_list_u = self.get_ranking_list_by_user_id(user_id, realtime=realtime, items=items*2)
+        r_ids    = list(set(r_list_u+r_list_n))
+        r_scores = [0]*len(r_ids)
+        if len(r_ids) == 0:
+            return []
+        for i, r_id in enumerate(r_ids):
+            if r_id in r_list_n:
+                r = r_list_n.index(r_id)
+                r_scores[i] += (items*2-r)
+            if r_id in r_list_u:
+                r = r_list_u.index(r_id)
+                r_scores[i] += (items*2-r)
+        r_scores, r_ids = zip(*sorted(zip(r_scores, r_ids), reverse=True))
+        return r_ids[:items]
+
 
     def add_news_vec_to_candidates_pool(self, news_id, update_pretrained_list=True):
         logging.info('=== ADDING === news_vec to candidates_pool...')
