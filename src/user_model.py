@@ -68,7 +68,7 @@ class UserModel:
                 X_pos.append(pos_list[start:start+items])
                 X_neg.append(neg_list[start:start+items])
         self.logging.info('- qualified users: {}'.format(len(user_list)))
-        self.logging.info('- complete building user-vectors')
+        self.logging.info('- complete building news vectors list')
 
         return user_list,X_pos,X_neg
 
@@ -102,40 +102,57 @@ class UserModel:
         t12 =  num / den
         return t12
 
-    def _build_many_to_one_model(self, shape, model_type='GRU'):
+    def _build_many_to_one_model(self, shape, model_type='GRU', init_rnn_by_avg=False, neg_sampling=False):
+        self.logging.info('******** model setting *********')
+        self.logging.info('*****')
+        self.logging.info('*****   model:{}'.format(model_type))
+        self.logging.info('*****   init :{}'.format(init_rnn_by_avg))
+        self.logging.info('*****   negs :{}'.format(neg_sampling))
+        self.logging.info('*****')
+        self.logging.info('********************************')
         input_pos = Input(shape=(shape[1],shape[2],), name="input_pos")
         input_neg = Input(shape=(shape[1],shape[2],), name="input_neg")
-        rnn = None
-
+        input_init= Lambda(lambda x:K.mean(x,axis=1,keepdims=False),name='input_init')(input_pos)        
         if model_type == 'GRU':
-            rnn = GRU(units=shape[2], input_shape=(shape[1],shape[2]), name="rnn")(input_pos)
+            rnn = GRU(units=shape[2], input_shape=(shape[1],shape[2]), name="rnn")
+            if init_rnn_by_avg:
+                rnn = rnn(inputs=input_pos, initial_state=input_init)
+            else:
+                rnn = rnn(inputs=input_pos)
         else: #LSTM
-            rnn = LSTM(units=shape[2], input_shape=(shape[1],shape[2]), name="rnn")(input_pos)
+            rnn = LSTM(units=shape[2], input_shape=(shape[1],shape[2]), name="rnn")
+            if init_rnn_by_avg:
+                rnn = rnn(inputs=input_pos, initial_state=[input_init,input_init])
+            else:
+                rnn = rnn(inputs=input_pos)
         
         user_vec = Dense(shape[2], name="user_vec")(rnn)
         user_vec_d3    = Lambda(lambda x: K.expand_dims(x, axis=1), name = "user_vec_3d")(user_vec)
-        batch_cos_pos_3d  = Lambda(self.pairwise_cos_sim, name="batch_cos_pos_3d")([input_pos,user_vec_d3])
-        batch_cos_neg_3d  = Lambda(self.pairwise_cos_sim, name="batch_cos_neg_3d")([input_neg,user_vec_d3])
-        
+        batch_cos_pos_3d  = Lambda(self.pairwise_cos_sim, name="batch_cos_pos_3d")([input_pos,user_vec_d3])        
         batch_cos_pos_2d  = Lambda(lambda x: K.squeeze(x, axis=-1), name="batch_cos_pos_2d")(batch_cos_pos_3d)
-        batch_cos_neg_2d  = Lambda(lambda x: K.squeeze(x, axis=-1), name="batch_cos_neg_2d")(batch_cos_neg_3d)
-        batch_cos_diff_2d = subtract([batch_cos_pos_2d, batch_cos_neg_2d], name="batch_cos_diff_2d")
 
-        output = Lambda(lambda x:1/(1 + K.exp(-x)), name="output")(batch_cos_diff_2d)
-        # output = Dense(shape[1], activation='sigmoid', name="output")(batch_dot_diff)
+        if neg_sampling:
+            batch_cos_neg_3d  = Lambda(self.pairwise_cos_sim, name="batch_cos_neg_3d")([input_neg,user_vec_d3])
+            batch_cos_neg_2d  = Lambda(lambda x: K.squeeze(x, axis=-1), name="batch_cos_neg_2d")(batch_cos_neg_3d)
+            batch_cos_diff_2d = subtract([batch_cos_pos_2d, batch_cos_neg_2d], name="batch_cos_diff_2d")
+            output = Lambda(lambda x:1/(1 + K.exp(-x)), name="output")(batch_cos_diff_2d)
+        else:
+            output = Lambda(lambda x:1/(1 + K.exp(-x*2)), name="output")(batch_cos_pos_2d)
         model  = Model(inputs=[input_pos,input_neg], outputs=output)
         model.compile(loss='mse', optimizer="adam")
         return model
 
-    def model_training(self, start=0, items=10, N=None, model_type='GRU', epochs=20, batch_size=16, validation_split=0.1, patience=10, verbose=1):
+    def model_training(self, start=0, items=10, N=None, model_type='GRU', init_rnn_by_avg=True, neg_sampling=True, epochs=20, batch_size=16, validation_split=0.1, patience=10, verbose=1):
         # 1. 讀入 positive 和 negative 的資料
         user_list, X_pos, X_neg = self._build_news_train(start=start, items=items, N=N)
         X_pos = np.asarray(X_pos)
         X_neg = np.asarray(X_neg)
         X_train = [X_pos,X_neg]
+        #U_init = X_pos.mean(1)
+        #X_train = [X_pos,X_neg,U_init]
         Y_train = np.ones((X_pos.shape[0],X_pos.shape[1]))
         # 3. 開始訓練
-        model = self._build_many_to_one_model(X_pos.shape, model_type=model_type)
+        model = self._build_many_to_one_model(X_pos.shape, model_type=model_type,init_rnn_by_avg=init_rnn_by_avg, neg_sampling=neg_sampling)
         callback = EarlyStopping(monitor="loss", patience=patience, verbose=verbose, mode="auto")
         model.fit(X_train,Y_train, epochs=epochs, batch_size=batch_size, validation_split=validation_split, callbacks=[callback])
         # 需要的是模型訓練時的中間產物，user_vec，將 user_vec 層讀出
