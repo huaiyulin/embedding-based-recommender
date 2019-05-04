@@ -117,8 +117,11 @@ class Preprocessor:
             pos_vecs = self.news_ids_to_vecs(pos_ids)
             user_to_news_pos_vec[user_id] = pos_vecs
         self.logging.info('- complete building user_to_news_pos_vec.')
-        return user_to_news_pos_vec
-
+        self.user_to_news_pos_vec = user_to_news_pos_vec
+        with open(self.config['user_to_news_pos_vec_path'], 'wb') as fp:
+            pickle.dump(self.user_to_news_pos_vec,fp)
+        self.logging.info('- complete saving user_to_news_pos_vec.')
+        
     def build_vec_pairs_from_history(self, at_least=10):
         self.logging.info('building user_news_vec_pairs...')
         user_to_news_pos_vec = {}
@@ -127,8 +130,8 @@ class Preprocessor:
             if len(pos_ids) < at_least:
                 continue
             neg_ids = self._get_neg_ids_by_pos_ids(pos_ids)
-            pos_vecs = self.news_ids_to_vecs(pos_ids)
-            neg_vecs = self.news_ids_to_vecs(neg_ids, items=len(pos_vecs))
+            pos_vecs = self.news_ids_to_vecs(pos_ids, items=at_least)
+            neg_vecs = self.news_ids_to_vecs(neg_ids, items=at_least)
             user_to_news_pos_vec[user_id] = pos_vecs
             user_to_news_neg_vec[user_id] = neg_vecs
 

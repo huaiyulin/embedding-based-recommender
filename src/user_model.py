@@ -65,8 +65,8 @@ class UserModel:
             neg_list = self.user_to_news_neg_vec[user_id]
             if len(pos_list) >= N and len(neg_list) >= N:
                 user_list.append(user_id)
-                X_pos.append(pos_list[start:start+items])
-                X_neg.append(neg_list[start:start+items])
+                X_pos.append(pos_list[start:start+items][::-1])
+                X_neg.append(neg_list[start:start+items][::-1])
         self.logging.info('- qualified users: {}'.format(len(user_list)))
         self.logging.info('- complete building news vectors list')
 
@@ -102,7 +102,7 @@ class UserModel:
         t12 =  num / den
         return t12
 
-    def _build_many_to_one_model(self, shape, model_type='GRU', init_rnn_by_avg=False, neg_sampling=False):
+    def _build_many_to_one_model(self, shape, user_length=None, model_type='GRU', init_rnn_by_avg=False, neg_sampling=False):
         self.logging.info('******** model setting *********')
         self.logging.info('*****')
         self.logging.info('*****   model:{}'.format(model_type))
@@ -110,21 +110,24 @@ class UserModel:
         self.logging.info('*****   negs :{}'.format(neg_sampling))
         self.logging.info('*****')
         self.logging.info('********************************')
+        if not user_length:
+            user_length=shape[1]
         input_pos = Input(shape=(shape[1],shape[2],), name="input_pos")
         input_neg = Input(shape=(shape[1],shape[2],), name="input_neg")
-        input_init= Lambda(lambda x:K.mean(x,axis=1,keepdims=False),name='input_init')(input_pos)        
+        input_user = Input(shape=(user_length,shape[2],), name="input_user")
+        input_init = Lambda(lambda x:K.mean(x,axis=1,keepdims=False),name='input_init')(input_user)        
         if model_type == 'GRU':
-            rnn = GRU(units=shape[2], input_shape=(shape[1],shape[2]), name="rnn")
+            rnn = GRU(units=shape[2], input_shape=(user_length,shape[2]), name="rnn")
             if init_rnn_by_avg:
-                rnn = rnn(inputs=input_pos, initial_state=input_init)
+                rnn = rnn(inputs=input_user, initial_state=input_init)
             else:
-                rnn = rnn(inputs=input_pos)
+                rnn = rnn(inputs=input_user)
         else: #LSTM
-            rnn = LSTM(units=shape[2], input_shape=(shape[1],shape[2]), name="rnn")
+            rnn = LSTM(units=shape[2], input_shape=(user_length,shape[2]), name="rnn")
             if init_rnn_by_avg:
-                rnn = rnn(inputs=input_pos, initial_state=[input_init,input_init])
+                rnn = rnn(inputs=input_user, initial_state=[input_init,input_init])
             else:
-                rnn = rnn(inputs=input_pos)
+                rnn = rnn(inputs=input_user)
         
         user_vec = Dense(shape[2], name="user_vec")(rnn)
         user_vec_d3    = Lambda(lambda x: K.expand_dims(x, axis=1), name = "user_vec_3d")(user_vec)
@@ -138,21 +141,25 @@ class UserModel:
             output = Lambda(lambda x:1/(1 + K.exp(-x)), name="output")(batch_cos_diff_2d)
         else:
             output = Lambda(lambda x:1/(1 + K.exp(-x*2)), name="output")(batch_cos_pos_2d)
-        model  = Model(inputs=[input_pos,input_neg], outputs=output)
+        model  = Model(inputs=[input_user,input_pos,input_neg], outputs=output)
         model.compile(loss='mse', optimizer="adam")
         return model
 
-    def model_training(self, start=0, items=10, N=None, model_type='GRU', init_rnn_by_avg=True, neg_sampling=True, epochs=20, batch_size=16, validation_split=0.1, patience=10, verbose=1):
+    def model_training(self, start=0, items=10, user_length=10, N=None, model_type='GRU', init_rnn_by_avg=True, neg_sampling=True, epochs=20, batch_size=16, validation_split=0.1, patience=10, verbose=1, suffix_name=''):
         # 1. 讀入 positive 和 negative 的資料
         user_list, X_pos, X_neg = self._build_news_train(start=start, items=items, N=N)
+        if user_length > items:
+            print('illegal length')
+            user_length = items
         X_pos = np.asarray(X_pos)
         X_neg = np.asarray(X_neg)
-        X_train = [X_pos,X_neg]
+        X_user  = X_pos[:,:user_length,:]
+        X_train = [X_user,X_pos,X_neg]
         #U_init = X_pos.mean(1)
         #X_train = [X_pos,X_neg,U_init]
         Y_train = np.ones((X_pos.shape[0],X_pos.shape[1]))
         # 3. 開始訓練
-        model = self._build_many_to_one_model(X_pos.shape, model_type=model_type,init_rnn_by_avg=init_rnn_by_avg, neg_sampling=neg_sampling)
+        model = self._build_many_to_one_model(X_pos.shape, user_length=user_length, model_type=model_type,init_rnn_by_avg=init_rnn_by_avg, neg_sampling=neg_sampling)
         callback = EarlyStopping(monitor="loss", patience=patience, verbose=verbose, mode="auto")
         model.fit(X_train,Y_train, epochs=epochs, batch_size=batch_size, validation_split=validation_split, callbacks=[callback])
         # 需要的是模型訓練時的中間產物，user_vec，將 user_vec 層讀出
@@ -161,13 +168,13 @@ class UserModel:
         self.predict_model = user_vec_model
         self.save_user_model()
         self.load_user_model()
-        user_vec_output = self.predict_model.predict([X_pos])
+        user_vec_output = self.predict_model.predict([X_user])
         # 將訓練得到的 user_vec 存起來
         user_dic = {}
         for i in range(len(user_vec_output)):
             user_dic[user_list[i]] = user_vec_output[i]
         self.user_to_vec = user_dic
-        self.save_user_vec_pool()
+        self.save_user_vec_pool(suffix_name=suffix_name)
     
     def build_user_vec_by_averaging(self,dic,items=10):
         self.logging.info('building user-vectors by averaging history')
@@ -192,7 +199,7 @@ class UserModel:
             pos_list = dic[user_id]
             if len(pos_list) >= items:
                 user_list.append(user_id)
-                X_pos.append(pos_list[:items])
+                X_pos.append(pos_list[:items][::-1])
         self.logging.info('- qualified users: {}'.format(len(user_list)))
         X_pos = np.asarray(X_pos)
         user_vec_output = self.predict_model.predict([X_pos])
@@ -202,10 +209,10 @@ class UserModel:
         self.logging.info('- complete building user-vectors')
         return user_dic
 
-    def save_user_vec_pool(self, path=None):
+    def save_user_vec_pool(self, path=None, suffix_name=''):
         self.logging.info('saving user-vectors...')
         if not path:
-            path = self.config['user_vec_pool_path']
+            path = (self.config['user_vec_pool_path']+suffix_name)
         with open(path, 'wb') as fp:
             pickle.dump(self.user_to_vec,fp)
         self.logging.info('- complete saving user-vectors to "{}"'.format(path))
