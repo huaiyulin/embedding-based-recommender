@@ -1,13 +1,14 @@
 import pandas as pd
 import numpy as np
 import pickle
-from keras.models import Model, load_model
-from keras.layers import Dense, Dropout, Activation, Flatten, LSTM, GRU
-from keras.layers import TimeDistributed, RepeatVector, Input, subtract, Lambda
-from keras import backend as K
-from keras.layers.normalization import BatchNormalization
-from keras.optimizers import Adam
-from keras.callbacks import EarlyStopping, ModelCheckpoint
+import tensorflow as tf
+from tf.keras.models import Model, load_model
+from tf.keras.layers import Dense, Dropout, Activation, Flatten, LSTM, GRU
+from tf.keras.layers import TimeDistributed, RepeatVector, Input, subtract, Lambda
+from tf.keras import backend as K
+from tf.keras.layers.normalization import BatchNormalization
+from tf.keras.optimizers import Adam
+from tf.keras.callbacks import EarlyStopping, ModelCheckpoint
 import os
 import logging
 
