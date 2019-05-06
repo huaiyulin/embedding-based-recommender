@@ -111,7 +111,6 @@ class Recommender:
         return dot_product / (norm_a * norm_b)
 
     def get_ranking_list_by_user_id(self, user_id, realtime=True, items=20):
-        logging.info('=== Getting === ranking_list by user_id...')
         ranking_list = None
         if user_id not in self.user_vec_pool:
             logging.info('- user_id not in user_pool')

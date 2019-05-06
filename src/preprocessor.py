@@ -9,7 +9,7 @@ import time
 # datasource config
 event_time = 'event_timestamp'
 news_id    = 'page.item.id'
-user_id    = 'cookie_mapping.et_token'
+user_id    = 'eds_id'
 
 class Preprocessor:
     """
@@ -63,21 +63,40 @@ class Preprocessor:
     def _clean_data(self, df):
         self.logging.info('- cleanning data...')
         df = df[[user_id,news_id,event_time]] # 篩選出需要的欄位
+        self.logging.info('- drop duplicating user/item pairs...')
         df = df.drop_duplicates(subset=[user_id, news_id]) # 清除重複的 news,user pair
         return df
 
     def build_user_to_news_history(self):
         self.logging.info('building user_to_news_list...')
         df = self._clean_data(self.events_for_training)
-        df.sort_values(by=event_time,ascending=False, inplace=True) # 將點擊事件由新到舊排序
+        self.logging.info('- sorting events...')
+        df = df.sort_values(by=event_time,ascending=False) # 將點擊事件由新到舊排序
         self.logging.info('- grouping news_id by user_id...')
         df_group_by_user_id = df.groupby(user_id)
+        self.logging.info('- convert news history into dictionary...')
         self.user_to_news_history = df_group_by_user_id[news_id].apply(list).to_dict()
         self.logging.info('- saving user_to_news_list...')
 
         with open(self.config['user_to_news_list_path'], 'wb') as fp:
             pickle.dump(self.user_to_news_history,fp)
         self.logging.info('- complete saving user_to_news_list.')
+
+
+    def build_user_to_news_history_custom(self):
+        self.logging.info('building user_to_news_list...')
+        df = self._clean_data(self.events_for_training)
+        self.logging.info('- sorting events...')
+        u_list,n_list = self.custom_sort(df) # 將點擊事件由新到舊排序
+        self.logging.info('- grouping news_id by user_id...')
+        self.logging.info('- convert news history into dictionary...')
+        self.user_to_news_history = self.custom_group_by(u_list,n_list)
+        self.logging.info('- saving user_to_news_list...')
+
+        with open(self.config['user_to_news_list_path'], 'wb') as fp:
+            pickle.dump(self.user_to_news_history,fp)
+        self.logging.info('- complete saving user_to_news_list.')
+
 
     def build_candidates_pool(self, top = 5000, at_least = 10):
         self.logging.info('building candidates_pool...')
@@ -109,7 +128,7 @@ class Preprocessor:
         return neg_ids
 
     def build_pos_vec_from_history(self, at_least=10):
-        self.logging.info('building user_news_vec_pairs...')
+        self.logging.info('building user_news_vec_positive...')
         user_to_news_pos_vec = {}
         for user_id, pos_ids in self.user_to_news_history.items():
             if len(pos_ids) < at_least:
@@ -126,21 +145,44 @@ class Preprocessor:
         self.logging.info('building user_news_vec_pairs...')
         user_to_news_pos_vec = {}
         user_to_news_neg_vec = {}
+        self.logging.info('- negative sampling and vector building start...')
         for user_id, pos_ids in self.user_to_news_history.items():
             if len(pos_ids) < at_least:
                 continue
             neg_ids = self._get_neg_ids_by_pos_ids(pos_ids)
-            pos_vecs = self.news_ids_to_vecs(pos_ids, items=at_least)
             neg_vecs = self.news_ids_to_vecs(neg_ids, items=at_least)
-            user_to_news_pos_vec[user_id] = pos_vecs
             user_to_news_neg_vec[user_id] = neg_vecs
 
+        self.logging.info('- positive vector building start...')
+        for user_id, pos_ids in self.user_to_news_history.items():
+            if len(pos_ids) < at_least:
+                continue
+            pos_vecs = self.news_ids_to_vecs(pos_ids, items=at_least)
+            user_to_news_pos_vec[user_id] = pos_vecs
+            
         self.user_to_news_pos_vec = user_to_news_pos_vec
         self.user_to_news_neg_vec = user_to_news_neg_vec
-
+        self.logging.info('- {} user_news_vec_pairs builded...'.format(len(self.user_to_news_pos_vec)))
         with open(self.config['user_to_news_pos_vec_path'], 'wb') as fp:
             pickle.dump(self.user_to_news_pos_vec,fp)
         self.logging.info('- complete saving user_to_news_pos_vec.')
         with open(self.config['user_to_news_neg_vec_path'], 'wb') as fp:
             pickle.dump(self.user_to_news_neg_vec,fp)
         self.logging.info('- complete saving user_to_news_neg_vec.')
+
+    def custom_sort(self, df):
+        df = df.sort_values(by=event_time,ascending=False) # 將點擊事件由新到舊排序
+        n_list = df[news_id].tolist()
+        u_list = df[user_id].tolist()
+        # t_list = df[event_time].tolist()
+        # t_list,u_list,n_list = zip(*sorted(zip(t_list,u_list,n_list), reverse=True))
+        return u_list,n_list
+
+    def custom_group_by(self, u_list,n_list):
+        u_dic = {}
+        for i, r in enumerate(u_list):
+            if r not in u_dic:
+                u_dic[u_list[i]] = [n_list[i]]
+            else:
+                u_dic[u_list[i]].append(n_list[i])
+        return u_dic
