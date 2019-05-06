@@ -25,7 +25,7 @@ class Recommender:
 
         self.config['candidates_pool_path'] = os.path.join(self.config['output_dir'], 'candidates_pool.pkl')
         self.config['user_vec_pool_path'] = os.path.join(self.config['output_dir'], 'user_vec_pool.pkl')
-        self.config['news_vec_pool_path'] = os.path.join(self.config['output_dir'], 'news_vec_pool.pkl')
+        self.config['news_vec_pool_path'] = os.path.join(dir, 'news_vec_pool.pkl')
         self.config['user_ranking_list_path'] = os.path.join(self.config['output_dir'], 'user_ranking_list.pkl')
         self.config['news_ranking_list_path'] = os.path.join(self.config['output_dir'], 'news_ranking_list.pkl')
         self.config['annoy_index_path'] = os.path.join(self.config['output_dir'], 'annoy_index.ann')
@@ -38,10 +38,17 @@ class Recommender:
         self.news_ranking_list = None
         self.annoy_indexer = None
 
-    def load_vec_pool(self):
-        self.candidates_pool = pd.read_pickle(self.config['candidates_pool_path'])
-        self.user_vec_pool   = pd.read_pickle(self.config['user_vec_pool_path'])
-        self.news_vec_pool   = pd.read_pickle(self.config['news_vec_pool_path'])
+    def load_vec_pool(self, news_vec_pool_path=None, user_vec_pool_path=None,candidates_pool=None):
+        if not news_vec_pool_path:
+            news_vec_pool_path = pd.read_pickle(self.config['news_vec_pool_path'])
+        if not user_vec_pool_path:
+            user_vec_pool_path = pd.read_pickle(self.config['user_vec_pool_path'])
+        if not candidates_pool:
+            candidates_pool_path = pd.read_pickle(self.config['candidates_pool_path'])
+        
+        self.candidates_pool = candidates_pool_path
+        self.user_vec_pool   = user_vec_pool_path
+        self.news_vec_pool   = news_vec_pool_path
 
     def load_ranking_list(self):
         self.user_ranking_list = pd.read_pickle(self.config['user_ranking_list_path'])

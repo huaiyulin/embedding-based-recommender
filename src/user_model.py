@@ -2,13 +2,16 @@ import pandas as pd
 import numpy as np
 import pickle
 import tensorflow as tf
-from tf.keras.models import Model, load_model
-from tf.keras.layers import Dense, Dropout, Activation, Flatten, LSTM, GRU
-from tf.keras.layers import TimeDistributed, RepeatVector, Input, subtract, Lambda
-from tf.keras import backend as K
-from tf.keras.layers.normalization import BatchNormalization
-from tf.keras.optimizers import Adam
-from tf.keras.callbacks import EarlyStopping, ModelCheckpoint
+# from tensorflow.keras.models import Model, load_model
+# from tensorflow.keras.layers import Dense, LSTM, GRU
+# from tensorflow.keras.layers import TimeDistributed, RepeatVector, Input, subtract, Lambda
+# from tensorflow.keras import backend as K
+# from tensorflow.keras.callbacks import EarlyStopping
+from keras.models import Model, load_model
+from keras.layers import Dense, LSTM, GRU
+from keras.layers import TimeDistributed, RepeatVector, Input, subtract, Lambda
+from keras import backend as K
+from keras.callbacks import EarlyStopping
 import os
 import logging
 
@@ -169,6 +172,7 @@ class UserModel:
         self.predict_model = user_vec_model
         self.save_user_model()
         self.load_user_model()
+        X_user  = X_pos[:,-user_length:,:]
         user_vec_output = self.predict_model.predict([X_user])
         # 將訓練得到的 user_vec 存起來
         user_dic = {}
