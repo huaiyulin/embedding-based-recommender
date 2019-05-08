@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
 	recommender = Recommender(dir=data_source_dir,name=output_name)
 	recommender.load_vec_pool()
-	recommender.get_ranking_list_by_both(user_id,news_id, realtime=True, items=20)
 	recommender.build_annoy_indexer()
+	
 	# r_list_u = recommender.get_ranking_list_by_annoy(user_id=u_id,items=10)
 	# r_list_n = recommender.get_ranking_list_by_annoy(news_id=n_id,items=10)

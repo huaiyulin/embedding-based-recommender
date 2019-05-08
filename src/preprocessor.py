@@ -45,11 +45,14 @@ class Preprocessor:
         self.news_vec_pool = pd.read_pickle(news_vec_pool_path)
 
     def load_datas_for_user_model(self, news_paths):
-        self.logging.info('loading {} days events for model training...'.format(len(news_paths)))
         dfs = []
         for news_path in news_paths:
-            df = pd.read_pickle(news_path)
-            dfs.append(df)
+            try:
+                df = pd.read_pickle(news_path)
+                dfs.append(df)
+                self.logging.info('loading "{}" events for model training...'.format(len(news_path)))
+            except:
+                continue
         self.events_for_training = pd.concat(dfs,ignore_index=True)
 
     def load_datas_for_candidates_pool(self, news_paths):
