@@ -50,17 +50,20 @@ class Preprocessor:
             try:
                 df = pd.read_pickle(news_path)
                 dfs.append(df)
-                self.logging.info('loading "{}" events for model training...'.format(len(news_path)))
+                self.logging.info('loading "{}" events for model training...'.format(news_path))
             except:
                 continue
         self.events_for_training = pd.concat(dfs,ignore_index=True)
 
     def load_datas_for_candidates_pool(self, news_paths):
-        self.logging.info('loading {} days events for candidates_pool...'.format(len(news_paths)))
         dfs = []
         for news_path in news_paths:
-            df = pd.read_pickle(news_path)
-            dfs.append(df)
+            try:
+                df = pd.read_pickle(news_path)
+                dfs.append(df)
+                self.logging.info('loading "{}" events for candidates_pool...'.format(news_path))
+            except:
+                continue
         self.events_for_candidates = pd.concat(dfs,ignore_index=True)
 
     def _clean_data(self, df):
