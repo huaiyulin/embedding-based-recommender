@@ -25,6 +25,8 @@ class Preprocessor:
         self.config['output_dir'] = os.path.join(dir, name)
         self.config['user_to_news_list_path']    = os.path.join(self.config['output_dir'], 'user_to_news_list.pkl')
         self.config['candidates_pool_path']      = os.path.join(self.config['output_dir'], 'candidates_pool.pkl')
+        self.config['user_to_news_pos_id_path'] = os.path.join(self.config['output_dir'], 'user_to_news_pos_id.pkl')
+        self.config['user_to_news_neg_id_path'] = os.path.join(self.config['output_dir'], 'user_to_news_neg_id.pkl')
         self.config['user_to_news_pos_vec_path'] = os.path.join(self.config['output_dir'], 'user_to_news_pos_vec.pkl')
         self.config['user_to_news_neg_vec_path'] = os.path.join(self.config['output_dir'], 'user_to_news_neg_vec.pkl')
 
@@ -38,6 +40,8 @@ class Preprocessor:
         self.sampling_pool = None
         self.user_to_news_history = None
         self.news_vec_pool = None
+        self.user_to_news_pos_id  = None
+        self.user_to_news_neg_id  = None
         self.user_to_news_pos_vec  = None
         self.user_to_news_neg_vec  = None
         
@@ -146,7 +150,31 @@ class Preprocessor:
         with open(self.config['user_to_news_pos_vec_path'], 'wb') as fp:
             pickle.dump(self.user_to_news_pos_vec,fp)
         self.logging.info('- complete saving user_to_news_pos_vec.')
-        
+    
+    def build_id_pairs_from_history(self, at_least=10):
+        self.logging.info('building user_news_to_id_pairs...')
+        user_to_news_pos_id = {}
+        user_to_news_neg_id = {}
+        self.logging.info('- negative sampling start...')
+        for user_id, pos_ids in self.user_to_news_history.items():
+            if len(pos_ids) < at_least:
+                continue
+            neg_ids = self._get_neg_ids_by_pos_ids(pos_ids)
+            neg_ids = [x for x in neg_ids if x in self.news_vec_pool]
+            pos_ids = [x for x in pos_ids if x in self.news_vec_pool]
+            user_to_news_pos_id[user_id] = pos_ids
+            user_to_news_neg_id[user_id] = neg_ids
+        self.user_to_news_pos_id = user_to_news_pos_id
+        self.user_to_news_neg_id = user_to_news_neg_id
+        self.logging.info('- {} user_news_id_pairs builded...'.format(len(self.user_to_news_neg_id)))
+        with open(self.config['user_to_news_pos_id_path'], 'wb') as fp:
+            pickle.dump(self.user_to_news_pos_id,fp)
+        self.logging.info('- complete saving user_to_news_pos_id.')
+        with open(self.config['user_to_news_neg_id_path'], 'wb') as fp:
+            pickle.dump(self.user_to_news_neg_id,fp)
+        self.logging.info('- complete saving user_to_news_neg_id.')
+
+
     def build_vec_pairs_from_history(self, at_least=10):
         self.logging.info('building user_news_vec_pairs...')
         user_to_news_pos_vec = {}
