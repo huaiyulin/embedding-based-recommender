@@ -185,7 +185,7 @@ class UserModel:
         
         input_pos = e_layer(input_pos_ids)
         input_neg = e_layer(input_neg_ids)
-        input_user = e_layer(input_neg_ids)
+        input_user = e_layer(input_user_ids)
         input_init = Lambda(lambda x:K.mean(x,axis=1,keepdims=False),name='input_init')(input_user)        
 
         if model_type == 'GRU':
@@ -270,7 +270,6 @@ class UserModel:
         if user_length > items:
             print('illegal length')
             user_length = items
-        user_length = 5
         X_pos = np.asarray(X_pos,dtype='int32')
         X_neg = np.asarray(X_neg,dtype='int32')
         X_user = X_pos[:,:user_length]        
