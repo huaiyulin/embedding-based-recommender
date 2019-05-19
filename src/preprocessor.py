@@ -179,20 +179,15 @@ class Preprocessor:
         self.logging.info('building user_news_vec_pairs...')
         user_to_news_pos_vec = {}
         user_to_news_neg_vec = {}
-        self.logging.info('- negative sampling and vector building start...')
-        for user_id, pos_ids in self.user_to_news_history.items():
-            if len(pos_ids) < at_least:
-                continue
-            neg_ids = self._get_neg_ids_by_pos_ids(pos_ids)
-            neg_vecs = self.news_ids_to_vecs(neg_ids, items=at_least)
-            user_to_news_neg_vec[user_id] = neg_vecs
-
         self.logging.info('- positive vector building start...')
-        for user_id, pos_ids in self.user_to_news_history.items():
-            if len(pos_ids) < at_least:
-                continue
-            pos_vecs = self.news_ids_to_vecs(pos_ids, items=at_least)
-            user_to_news_pos_vec[user_id] = pos_vecs
+        for user_id, ids in self.user_to_news_pos_id.items():
+            vecs = self.news_ids_to_vecs(ids, items=at_least)
+            user_to_news_pos_vec[user_id] = vecs
+        
+        self.logging.info('- negative vector building start...')
+        for user_id, ids in self.user_to_news_neg_id.items():
+            vecs = self.news_ids_to_vecs(ids, items=at_least)
+            user_to_news_neg_vec[user_id] = vecs
             
         self.user_to_news_pos_vec = user_to_news_pos_vec
         self.user_to_news_neg_vec = user_to_news_neg_vec

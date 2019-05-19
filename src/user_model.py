@@ -215,6 +215,7 @@ class UserModel:
             output = Lambda(lambda x:1/(1 + K.exp(-x*2)), name="output")(batch_cos_pos_2d)
         model  = Model(inputs=[input_user_ids,input_pos_ids,input_neg_ids], outputs=output)
         model.compile(loss='mse', optimizer="adam")
+        self.logging.info(model.summary())
         return model
 
 
@@ -260,6 +261,7 @@ class UserModel:
             output = Lambda(lambda x:1/(1 + K.exp(-x*2)), name="output")(batch_cos_pos_2d)
         model  = Model(inputs=[input_user,input_pos,input_neg], outputs=output)
         model.compile(loss='mse', optimizer="adam")
+        self.logging.info(model.summary())
         return model
     
     def model_training_dict_version(self, start=0, items=10, user_length=10, N=None, model_type='GRU', init_rnn_by_avg=True, neg_sampling=True, epochs=20, batch_size=16, validation_split=0.1, patience=10, verbose=1, suffix_name=''):
@@ -288,10 +290,11 @@ class UserModel:
         layer_name = 'user_vec'
         user_vec_model = Model(inputs=model.input, outputs=model.get_layer(layer_name).output)
         self.predict_model = user_vec_model
-        self.save_user_model()
-        self.load_user_model()
-        X_user  = X_pos[:,-user_length:,:]
-        user_vec_output = self.predict_model.predict([X_user])
+        # self.save_user_model()
+        # self.load_user_model()
+        X_user  = X_pos[:,-user_length:]
+        X_train = [X_user,X_pos,X_neg]
+        user_vec_output = self.predict_model.predict(X_train)
         # 將訓練得到的 user_vec 存起來
         user_dic = {}
         for i in range(len(user_vec_output)):
