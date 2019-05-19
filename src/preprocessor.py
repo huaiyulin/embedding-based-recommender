@@ -7,9 +7,9 @@ import logging
 import time
 
 # datasource config
-event_time = 'event_timestamp'
-news_id    = 'page.item.id'
-user_id    = 'eds_id'
+event_time = 'user_id'
+news_id    = 'event_time'
+user_id    = 'news_id'
 
 class Preprocessor:
     """
