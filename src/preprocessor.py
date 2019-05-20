@@ -85,12 +85,11 @@ class Preprocessor:
         self.logging.info('- grouping news_id by user_id...')
         df_group_by_user_id = df.groupby(user_id)
         self.logging.info('- convert news history into dictionary...')
-        self.user_to_news_history = df_group_by_user_id[news_id].apply(list).to_dict()
-        self.logging.info('- saving user_to_news_list...')
-
-        with open(self.config['user_to_news_list_path'], 'wb') as fp:
-            pickle.dump(self.user_to_news_history,fp)
-        self.logging.info('- complete saving user_to_news_list.')
+        # self.user_to_news_history = df_group_by_user_id[news_id].apply(list).to_dict()
+        # self.logging.info('- saving user_to_news_list...')
+        # with open(self.config['user_to_news_list_path'], 'wb') as fp:
+        #     pickle.dump(self.user_to_news_history,fp)
+        # self.logging.info('- complete saving user_to_news_list.')
 
 
     def build_user_to_news_history_custom(self):
@@ -101,11 +100,10 @@ class Preprocessor:
         self.logging.info('- grouping news_id by user_id...')
         self.logging.info('- convert news history into dictionary...')
         self.user_to_news_history = self.custom_group_by(u_list,n_list)
-        self.logging.info('- saving user_to_news_list...')
-
-        with open(self.config['user_to_news_list_path'], 'wb') as fp:
-            pickle.dump(self.user_to_news_history,fp)
-        self.logging.info('- complete saving user_to_news_list.')
+        # self.logging.info('- saving user_to_news_list...')
+        # with open(self.config['user_to_news_list_path'], 'wb') as fp:
+        #     pickle.dump(self.user_to_news_history,fp)
+        # self.logging.info('- complete saving user_to_news_list.')
 
 
     def build_candidates_pool(self, top = 5000, at_least = 10):
