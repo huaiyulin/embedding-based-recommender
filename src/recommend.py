@@ -1,15 +1,12 @@
 import logging
 import os
-from preprocessor import Preprocessor
-from user_model import UserModel
 from annoy import AnnoyIndex
 from recommender import Recommender
-import random
 import pandas as pd
 import random
 
 data_source_dir = '../data' 
-output_name = '0428'
+output_name = '0518'
 
 def logging_setup():
     logging.basicConfig(
@@ -51,13 +48,14 @@ if __name__ == '__main__':
 		
 		if realtime == 'n':
 			realtime = False
-	
+		else:
+			realtime = True
 		try:
 			items = int(items)
 		except:
 			items = 10
 
 		## return rec_list
-		r_list_u = recommender.get_ranking_list_by_both(user_id,news_id, realtime, items)
+		r_list_u = recommender.get_ranking_list_by_both(user_id, news_id, realtime, items)
 		print(r_list_u)
 		
