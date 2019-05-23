@@ -10,9 +10,9 @@ from user_model import UserModel
 from recommender import Recommender
 from data.config import Config
 data_source_dir = Config.Directory.data_dir
-news_train_paths = [os.path.join(data_source_dir,file_name) for file_name in Config.TrainingEvent.file_names]
-news_candidates_paths = [os.path.join(data_source_dir,file_name) for file_name in Config.CandidateEvent.file_names]
-news_vec_pool_path = os.path.join(data_source_dir,'news_vec_pool.pkl')
+news_train_paths = Config.TrainingEvent.file_paths
+news_candidates_paths = Config.CandidateEvent.file_paths
+news_vec_pool_path = Config.Pool.news_vec_pool_path
 
 def logging_setup():
     logging.basicConfig(

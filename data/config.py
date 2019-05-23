@@ -13,6 +13,7 @@ class TrainingEvent:
     for x in range(int(_start),int(_end)):
         file_name = _prefix + str(x).zfill(4) + '.pkl'
         file_names.append(file_name)
+    file_paths = None
 
 class CandidateEvent:
     _start  = '0428'
@@ -22,6 +23,7 @@ class CandidateEvent:
     for x in range(int(_start),int(_end)):
         file_name = _prefix + str(x).zfill(4) + '.pkl'
         file_names.append(file_name)
+    file_paths = None
 
 class Directory:
     model_name  = "{}-{}".format(TrainingEvent._start,TrainingEvent._end)
@@ -69,3 +71,6 @@ class Config:
     ColumnName  = ColumnName
     Preprocessor = Preprocessor
     Pool = Pool
+
+    CandidateEvent.file_paths = [os.path.join(Directory.data_dir,file_name) for file_name in CandidateEvent.file_names]
+    TrainingEvent.file_paths  = [os.path.join(Directory.data_dir,file_name) for file_name in TrainingEvent.file_names]
