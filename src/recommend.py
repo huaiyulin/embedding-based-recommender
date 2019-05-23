@@ -4,9 +4,7 @@ from annoy import AnnoyIndex
 from recommender import Recommender
 import pandas as pd
 import random
-
-data_source_dir = '../data' 
-output_name = '0518'
+from data.config import Config
 
 def logging_setup():
     logging.basicConfig(
@@ -19,7 +17,7 @@ if __name__ == '__main__':
 	logging_setup()
 	logging.info('=============== Lauch Recommender ===============')
 
-	recommender = Recommender(dir=data_source_dir,name=output_name)
+	recommender = Recommender(Config=Config)
 	recommender.load_vec_pool()
 	
 

@@ -58,6 +58,10 @@ class Pool:
     user_vec_pool_path  = os.path.join(Directory.vec_pool_dir,_user_vec_pool_name)
     candidate_pool_path = os.path.join(Directory.vec_pool_dir,_candidate_pool_name)
 
+class Recommender:
+    _annoy_indexer_name    = 'annoy_indexer.ann'
+    annoy_indexer_path    = os.path.join(Directory.vec_pool_dir,_annoy_indexer_name)
+
 class Config:
     """
 
@@ -68,9 +72,9 @@ class Config:
     Directory = Directory
     CandidateEvent = CandidateEvent
     TrainingEvent  = TrainingEvent
-    ColumnName  = ColumnName
+    ColumnName   = ColumnName
     Preprocessor = Preprocessor
     Pool = Pool
-
+    Recommender  = Recommender
     CandidateEvent.file_paths = [os.path.join(Directory.data_dir,file_name) for file_name in CandidateEvent.file_names]
     TrainingEvent.file_paths  = [os.path.join(Directory.data_dir,file_name) for file_name in TrainingEvent.file_names]

@@ -21,7 +21,7 @@ class Preprocessor:
         self.event_time = None
         self.events_for_training = None
         self.events_for_candidates = None
-        self.candidates_pool = None
+        self.candidate_pool = None
         self.sampling_pool = None
         self.user_to_news_history = None
         self.news_vec_pool = None
@@ -35,7 +35,7 @@ class Preprocessor:
             self.name = Config.model_name
             self.config['output_dir'] = Config.Directory.model_dir
             self.config['user_to_news_list_path']    = Config.Preprocessor.user_to_news_history_path
-            self.config['candidates_pool_path']      = Config.Pool.candidate_pool_path
+            self.config['candidate_pool_path']      = Config.Pool.candidate_pool_path
             self.config['user_to_news_pos_id_path']  = Config.Preprocessor.user_to_news_pos_id_path
             self.config['user_to_news_neg_id_path']  = Config.Preprocessor.user_to_news_neg_id_path
             self.config['user_to_news_pos_vec_path'] = Config.Preprocessor.user_to_news_pos_vec_path
@@ -63,13 +63,13 @@ class Preprocessor:
                 continue
         self.events_for_training = pd.concat(dfs,ignore_index=True)
 
-    def load_datas_for_candidates_pool(self, news_paths):
+    def load_datas_for_candidate_pool(self, news_paths):
         dfs = []
         for news_path in news_paths:
             try:
                 df = pd.read_pickle(news_path)
                 dfs.append(df)
-                self.logging.info('loading "{}" events for candidates_pool...'.format(news_path))
+                self.logging.info('loading "{}" events for candidate_pool...'.format(news_path))
             except:
                 continue
         self.events_for_candidates = pd.concat(dfs,ignore_index=True)
@@ -110,16 +110,16 @@ class Preprocessor:
         # self.logging.info('- complete saving user_to_news_list.')
 
 
-    def build_candidates_pool(self, top = 5000, at_least = 10):
-        self.logging.info('building candidates_pool...')
+    def build_candidate_pool(self, top = 5000, at_least = 10):
+        self.logging.info('building candidate_pool...')
         df = self._clean_data(self.events_for_candidates)
         news_count = df.groupby(self.news_id).size().reset_index().sort_values([0],ascending = False).reset_index()
-        self.candidates_pool = news_count[(news_count.index < top) + (news_count[0] > at_least).values][self.news_id].tolist()
-        self.logging.info('- saving candidates_pool...')
-        self.candidates_pool = {c_id:self.news_vec_pool[c_id] for c_id in self.candidates_pool if c_id in self.news_vec_pool}
-        with open(self.config['candidates_pool_path'], 'wb') as fp:
-            pickle.dump(self.candidates_pool,fp)
-        self.logging.info('- complete saving candidates_pool.')
+        self.candidate_pool = news_count[(news_count.index < top) + (news_count[0] > at_least).values][self.news_id].tolist()
+        self.logging.info('- saving candidate_pool...')
+        self.candidate_pool = {c_id:self.news_vec_pool[c_id] for c_id in self.candidate_pool if c_id in self.news_vec_pool}
+        with open(self.config['candidate_pool_path'], 'wb') as fp:
+            pickle.dump(self.candidate_pool,fp)
+        self.logging.info('- complete saving candidate_pool.')
 
     def build_sampling_pool(self, top = 5000, at_least = 10):
         self.logging.info('building sampling_pool...')

@@ -14,39 +14,40 @@ class Recommender:
     Args: Temporary
 
     """
-    def __init__(self, dir='../data', name=None):
-        if not name:
-            name = time.asctime(time.localtime(time.time()))
-        self.name = name
-        self.config = {}
-        self.config['output_dir'] = os.path.join(dir, name)
-        if not os.path.exists(self.config['output_dir']):
-            os.makedirs(self.config['output_dir'])
+    def __init__(self, Config = None):
 
-        self.config['candidates_pool_path'] = os.path.join(self.config['output_dir'], 'candidates_pool.pkl')
-        self.config['user_vec_pool_path'] = os.path.join(self.config['output_dir'], 'user_vec_pool.pkl')
-        self.config['news_vec_pool_path'] = os.path.join(dir, 'news_vec_pool.pkl')
-        self.config['user_ranking_list_path'] = os.path.join(self.config['output_dir'], 'user_ranking_list.pkl')
-        self.config['news_ranking_list_path'] = os.path.join(self.config['output_dir'], 'news_ranking_list.pkl')
-        self.config['annoy_index_path'] = os.path.join(self.config['output_dir'], 'annoy_index.ann')
 
         self.logging = logging.getLogger(name=__name__)
-        self.candidates_pool = None
+        self.candidate_pool = None
         self.user_vec_pool = None
         self.news_vec_pool = None
         self.user_ranking_list = None
         self.news_ranking_list = None
         self.annoy_indexer = None
+        self.config = {}
 
-    def load_vec_pool(self, news_vec_pool_path=None, user_vec_pool_path=None,candidates_pool=None):
+        if Config != None:
+            self.name = Config.model_name
+            self.config['output_dir'] = Config.Directory.model_dir
+            self.config['candidate_pool_path'] = Config.Pool.candidate_pool_path
+            self.config['user_vec_pool_path'] = Config.Pool.user_vec_pool_path
+            self.config['news_vec_pool_path'] = Config.Pool.news_vec_pool_path
+            self.config['user_ranking_list_path'] = os.path.join(self.config['output_dir'], 'user_ranking_list.pkl')
+            self.config['news_ranking_list_path'] = os.path.join(self.config['output_dir'], 'news_ranking_list.pkl')
+            self.config['annoy_indexer_path'] = Config.Recommender.annoy_indexer_path
+
+
+
+
+    def load_vec_pool(self, news_vec_pool_path=None, user_vec_pool_path=None,candidate_pool=None):
         if not news_vec_pool_path:
             news_vec_pool_path = pd.read_pickle(self.config['news_vec_pool_path'])
         if not user_vec_pool_path:
             user_vec_pool_path = pd.read_pickle(self.config['user_vec_pool_path'])
-        if not candidates_pool:
-            candidates_pool_path = pd.read_pickle(self.config['candidates_pool_path'])
+        if not candidate_pool:
+            candidate_pool_path = pd.read_pickle(self.config['candidate_pool_path'])
         
-        self.candidates_pool = candidates_pool_path
+        self.candidate_pool = candidate_pool_path
         self.user_vec_pool   = user_vec_pool_path
         self.news_vec_pool   = news_vec_pool_path
 
@@ -55,7 +56,7 @@ class Recommender:
         self.news_ranking_list = pd.read_pickle(self.config['news_ranking_list_path'])
 
     def build_ranking_list(self, type='both', save=True, items=20):
-        c_ids, c_vecs = zip(*self.candidates_pool.items())
+        c_ids, c_vecs = zip(*self.candidate_pool.items())
         if type == 'both':
             logging.info('=== Building === ranking_list by user_id...')
             i = 0
@@ -123,7 +124,7 @@ class Recommender:
             logging.info('- user_id not in user_pool')
             return []
         if realtime == True:
-            c_ids, c_vecs = zip(*self.candidates_pool.items())
+            c_ids, c_vecs = zip(*self.candidate_pool.items())
             u_vec = self.user_vec_pool[user_id]
             c_scores = [self._cos_sim(u_vec,c_vec) for c_vec in c_vecs]
             c_scores, c_ids = zip(*sorted(zip(c_scores, c_ids),reverse=True))
@@ -137,7 +138,7 @@ class Recommender:
             logging.info('- news_id not in news_pool')
             return []
         if realtime == True:
-            c_ids, c_vecs = zip(*self.candidates_pool.items())
+            c_ids, c_vecs = zip(*self.candidate_pool.items())
             n_vec = self.news_vec_pool[news_id]
             c_scores = [self._cos_sim(n_vec,c_vec) for c_vec in c_vecs]
             c_scores, c_ids = zip(*sorted(zip(c_scores, c_ids),reverse=True))
@@ -164,15 +165,15 @@ class Recommender:
         return r_ids[:items]
 
 
-    def add_news_vec_to_candidates_pool(self, news_id, update_pretrained_list=True):
-        logging.info('=== ADDING === news_vec to candidates_pool...')
+    def add_news_vec_to_candidate_pool(self, news_id, update_pretrained_list=True):
+        logging.info('=== ADDING === news_vec to candidate_pool...')
 
     def build_annoy_indexer(self, trees=10, path=None):
         if not path:
-            path = self.config['annoy_index_path']
-        vec_len = len(list(self.candidates_pool.values())[0])
+            path = self.config['annoy_indexer_path']
+        vec_len = len(list(self.candidate_pool.values())[0])
         t = AnnoyIndex(vec_len)  # Length of item vector that will be indexed
-        for i, v in self.candidates_pool.items():
+        for i, v in self.candidate_pool.items():
             t.add_item(int(i), v)
         t.build(trees) # 10 trees
         self.annoy_indexer = t
@@ -180,8 +181,8 @@ class Recommender:
 
     def load_annoy_indexer(self, path=None):
         if not path:
-            path = self.config['annoy_index_path']
-        vec_len = len(list(self.candidates_pool.values())[0])
+            path = self.config['annoy_indexer_path']
+        vec_len = len(list(self.candidate_pool.values())[0])
         t = AnnoyIndex(vec_len)
         t.load(path)
         self.annoy_indexer = t
