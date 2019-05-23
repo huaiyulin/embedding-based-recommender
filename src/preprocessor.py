@@ -182,6 +182,12 @@ class Preprocessor:
         user_to_news_pos_vec = {}
         user_to_news_neg_vec = {}
         self.logging.info('- positive vector building start...')
+        if self.user_to_news_pos_id == None:
+            self.logging.info('- load user_to_news_pos_id from saved data...')
+            self.user_to_news_pos_id = pd.read_pickle(self.config['user_to_news_pos_id_path'])
+            self.logging.info('- load user_to_news_neg_id from saved data...')
+            self.user_to_news_neg_id = pd.read_pickle(self.config['user_to_news_neg_id_path'])
+
         for user_id, ids in self.user_to_news_pos_id.items():
             vecs = self.news_ids_to_vecs(ids, items=at_least)
             user_to_news_pos_vec[user_id] = vecs
