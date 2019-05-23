@@ -115,19 +115,19 @@ class UserModel:
             pos_item_list = self.user_to_news_pos_vec
             neg_item_list = self.user_to_news_neg_vec
             
-        X_pos, X_neg = [], []
+        x_pos, x_neg = [], []
         user_list = []
         for i,user_id in enumerate(pos_item_list): 
             pos_list = pos_item_list[user_id]
             neg_list = neg_item_list[user_id]
             if len(pos_list) >= N and len(neg_list) >= N:
                 user_list.append(user_id)
-                X_pos.append(pos_list[start:start+items][::-1])
-                X_neg.append(neg_list[start:start+items][::-1])
+                x_pos.append(pos_list[start:start+items][::-1])
+                x_neg.append(neg_list[start:start+items][::-1])
         self.logging.info('- qualified users: {}'.format(len(user_list)))
         self.logging.info('- complete building news vectors list')
 
-        return user_list,X_pos,X_neg
+        return user_list,x_pos,x_neg
 
     def cos_sim(self, a, b):
         """Takes 2 vectors a, b and returns the cosine similarity according 
@@ -159,6 +159,24 @@ class UserModel:
         t12 =  num / den
         return t12
 
+    def update_embedding_layer_of_pretrained_model(self):
+        self._news_dict_preprocess()
+        self.logging.info('updating embedding layer...')
+        # get "user_length"
+        layer_name = 'input_user_ids'
+        a = self.predict_model.get_layer(layer_name)
+        user_length = a.input_shape[1]
+
+        # build new "embedding_matrix"
+        embedding_matrix=self.news_vec_dict
+        doc_size   = embedding_matrix.shape[0]
+        vector_dim = embedding_matrix.shape[1]
+
+        # update "embedding_matrix"
+        e_layer_user = Embedding(doc_size,vector_dim, weights=[embedding_matrix], input_length=user_length, trainable=False, name='embedding_user')
+        self.predict_model.layers[1] = e_layer_user
+        self.logging.info(' - completed updating embedding_layer!')
+
     def _build_many_to_one_dict_model(self, shape, user_length=None, model_type='GRU', init_rnn_by_avg=False, neg_sampling=False, embedding_matrix=None):
         self.logging.info('******** model setting *********')
         self.logging.info('*****')
@@ -178,12 +196,13 @@ class UserModel:
         input_pos_ids = Input(shape=(doc_length,),  dtype='int32', name="input_pos_ids")
         input_neg_ids = Input(shape=(doc_length,),  dtype='int32', name="input_neg_ids")
         input_user_ids = Input(shape=(user_length,),  dtype='int32', name="input_user_ids")
-        
-        e_layer = Embedding(doc_size,vector_dim, weights=[embedding_matrix], input_length=doc_length, trainable=False)
-        
+
+        e_layer = Embedding(doc_size,vector_dim, weights=[embedding_matrix], input_length=doc_length, trainable=False, name='embedding_history')
+        e_layer_user = Embedding(doc_size,vector_dim, weights=[embedding_matrix], input_length=user_length, trainable=False, name='embedding_user')
+
         input_pos = e_layer(input_pos_ids)
         input_neg = e_layer(input_neg_ids)
-        input_user = e_layer(input_user_ids)
+        input_user = e_layer_user(input_user_ids)
         input_init = Lambda(lambda x:K.mean(x,axis=1,keepdims=False),name='input_init')(input_user)        
 
         if model_type == 'GRU':
@@ -264,17 +283,17 @@ class UserModel:
     
     def model_training_dict_version(self, start=0, items=10, user_length=10, N=None, model_type='GRU', init_rnn_by_avg=True, neg_sampling=True, epochs=20, batch_size=16, validation_split=0.1, patience=10, verbose=1, suffix_name=''):
         self._news_dict_preprocess()
-        user_list, X_pos, X_neg = self._build_news_train(start=start, items=items, N=N, by_id=True)
+        user_list, x_pos, x_neg = self._build_news_train(start=start, items=items, N=N, by_id=True)
         if user_length > items:
             print('illegal length')
             user_length = items
-        X_pos = np.asarray(X_pos,dtype='int32')
-        X_neg = np.asarray(X_neg,dtype='int32')
-        X_user = X_pos[:,:user_length]        
-        X_train = [X_user,X_pos,X_neg]
-        Y_train = np.ones((X_pos.shape[0],X_pos.shape[1]))
+        x_pos = np.asarray(x_pos,dtype='int32')
+        x_neg = np.asarray(x_neg,dtype='int32')
+        x_user = x_pos[:,:user_length]        
+        x_train = [x_user,x_pos,x_neg]
+        y_train = np.ones((x_pos.shape[0],x_pos.shape[1]))
         # 3. 開始訓練
-        model = self._build_many_to_one_dict_model(X_pos.shape, 
+        model = self._build_many_to_one_dict_model(x_pos.shape, 
                                                    user_length=user_length, 
                                                    model_type=model_type,
                                                    init_rnn_by_avg=init_rnn_by_avg, 
@@ -282,16 +301,16 @@ class UserModel:
                                                    embedding_matrix=self.news_vec_dict)
         
         callback = EarlyStopping(monitor="loss", patience=patience, verbose=verbose, mode="auto")
-        model.fit(X_train,Y_train, epochs=epochs, batch_size=batch_size, validation_split=validation_split, callbacks=[callback])
+        model.fit(x_train,y_train, epochs=epochs, batch_size=batch_size, validation_split=validation_split, callbacks=[callback])
         # 需要的是模型訓練時的中間產物，user_vec，將 user_vec 層讀出
         layer_name = 'user_vec'
         user_vec_model = Model(inputs=model.input, outputs=model.get_layer(layer_name).output)
         self.predict_model = user_vec_model
-        # self.save_user_model()
-        # self.load_user_model()
-        X_user  = X_pos[:,-user_length:]
-        X_train = [X_user,X_pos,X_neg]
-        user_vec_output = self.predict_model.predict(X_train)
+        self.save_user_model()
+        self.load_user_model()
+        x_user  = x_pos[:,-user_length:]
+        x_train = [x_user]
+        user_vec_output = self.predict_model.predict(x_train)
         # 將訓練得到的 user_vec 存起來
         user_dic = {}
         for i in range(len(user_vec_output)):
@@ -302,29 +321,29 @@ class UserModel:
     
     def model_training(self, start=0, items=10, user_length=10, N=None, model_type='GRU', init_rnn_by_avg=True, neg_sampling=True, epochs=20, batch_size=16, validation_split=0.1, patience=10, verbose=1, suffix_name=''):
         # 1. 讀入 positive 和 negative 的資料
-        user_list, X_pos, X_neg = self._build_news_train(start=start, items=items, N=N)
+        user_list, x_pos, x_neg = self._build_news_train(start=start, items=items, N=N)
         if user_length > items:
             print('illegal length')
             user_length = items
-        X_pos = np.asarray(X_pos)
-        X_neg = np.asarray(X_neg)
-        X_user  = X_pos[:,:user_length,:]
-        X_train = [X_user,X_pos,X_neg]
-        #U_init = X_pos.mean(1)
-        #X_train = [X_pos,X_neg,U_init]
-        Y_train = np.ones((X_pos.shape[0],X_pos.shape[1]))
+        x_pos = np.asarray(x_pos)
+        x_neg = np.asarray(x_neg)
+        x_user  = x_pos[:,:user_length,:]
+        x_train = [x_user,x_pos,x_neg]
+        #U_init = x_pos.mean(1)
+        #x_train = [x_pos,x_neg,U_init]
+        y_train = np.ones((x_pos.shape[0],x_pos.shape[1]))
         # 3. 開始訓練
-        model = self._build_many_to_one_model(X_pos.shape, user_length=user_length, model_type=model_type,init_rnn_by_avg=init_rnn_by_avg, neg_sampling=neg_sampling)
+        model = self._build_many_to_one_model(x_pos.shape, user_length=user_length, model_type=model_type,init_rnn_by_avg=init_rnn_by_avg, neg_sampling=neg_sampling)
         callback = EarlyStopping(monitor="loss", patience=patience, verbose=verbose, mode="auto")
-        model.fit(X_train,Y_train, epochs=epochs, batch_size=batch_size, validation_split=validation_split, callbacks=[callback])
+        model.fit(x_train,y_train, epochs=epochs, batch_size=batch_size, validation_split=validation_split, callbacks=[callback])
         # 需要的是模型訓練時的中間產物，user_vec，將 user_vec 層讀出
         layer_name = 'user_vec'
         user_vec_model = Model(inputs=model.input, outputs=model.get_layer(layer_name).output)
         self.predict_model = user_vec_model
         self.save_user_model()
         self.load_user_model()
-        X_user  = X_pos[:,-user_length:,:]
-        user_vec_output = self.predict_model.predict([X_user])
+        x_user  = x_pos[:,-user_length:,:]
+        user_vec_output = self.predict_model.predict([x_user])
         # 將訓練得到的 user_vec 存起來
         user_dic = {}
         for i in range(len(user_vec_output)):
@@ -349,16 +368,16 @@ class UserModel:
 
     def build_user_vec_by_pretrained_model(self,dic,items=10):
         self.logging.info('building user-vectors from history')
-        X_pos = []
+        x_pos = []
         user_list = []
         for i,user_id in enumerate(dic): 
             pos_list = dic[user_id]
             if len(pos_list) >= items:
                 user_list.append(user_id)
-                X_pos.append(pos_list[:items][::-1])
+                x_pos.append(pos_list[:items][::-1])
         self.logging.info('- qualified users: {}'.format(len(user_list)))
-        X_pos = np.asarray(X_pos)
-        user_vec_output = self.predict_model.predict([X_pos])
+        x_pos = np.asarray(x_pos)
+        user_vec_output = self.predict_model.predict([x_pos])
         user_dic = {}
         for i in range(len(user_vec_output)):
             user_dic[user_list[i]] = user_vec_output[i]
