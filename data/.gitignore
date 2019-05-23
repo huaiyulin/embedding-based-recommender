@@ -3,3 +3,4 @@ dora-ettoday*.json
 event-*.pkl
 *.pkl
 *.ann
+*.h5
