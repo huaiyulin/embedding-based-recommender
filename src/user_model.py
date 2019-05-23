@@ -160,21 +160,11 @@ class UserModel:
         return t12
 
     def update_embedding_layer_of_pretrained_model(self):
-        self._news_dict_preprocess()
-        self.logging.info('updating embedding layer...')
-        # get "user_length"
-        layer_name = 'input_user_ids'
-        a = self.predict_model.get_layer(layer_name)
-        user_length = a.input_shape[1]
-
         # build new "embedding_matrix"
-        embedding_matrix=self.news_vec_dict
-        doc_size   = embedding_matrix.shape[0]
-        vector_dim = embedding_matrix.shape[1]
-
+        self._news_dict_preprocess()
         # update "embedding_matrix"
-        e_layer_user = Embedding(doc_size,vector_dim, weights=[embedding_matrix], input_length=user_length, trainable=False, name='embedding_user')
-        self.predict_model.layers[1] = e_layer_user
+        self.logging.info('updating embedding layer...')
+        self.predict_model.layers[1].set_weights([self.news_vec_dict])
         self.logging.info(' - completed updating embedding_layer!')
 
     def _build_many_to_one_dict_model(self, shape, user_length=None, model_type='GRU', init_rnn_by_avg=False, neg_sampling=False, embedding_matrix=None):
