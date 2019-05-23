@@ -38,7 +38,7 @@ class Preprocessor:
     _user_to_news_neg_vec_name = 'user_to_news_neg_vec.pkl'
     _user_to_news_pos_id_name  = 'user_to_news_pos_id.pkl'
     _user_to_news_neg_id_name  = 'user_to_news_neg_id.pkl'
-    _user_model_name           = 'user_model.pkl'
+    _user_model_name           = 'user_model.h5'
 
     model_dir = Directory.model_dir
     user_to_news_history_path = os.path.join(model_dir,_user_to_news_history_name)

@@ -46,7 +46,7 @@ class Preprocessor:
             if not os.path.exists(self.config['output_dir']):
                 os.makedirs(self.config['output_dir'])
         else:
-            self.logging.warning('You don\' set the Config, so all paths of this preprocessor are nil!')
+            self.logging.warning('You don\'t set the Config, so all paths of this preprocessor are nil!')
 
         
     def load_news_vec_pool(self, news_vec_pool_path):

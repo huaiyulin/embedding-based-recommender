@@ -19,21 +19,7 @@ class UserModel:
     Args: Temporary
 
     """
-    def __init__(self, dir='../data', name=None):
-        if not name:
-            name = time.asctime(time.localtime(time.time()))
-        self.name = name
-        self.config = {}
-        self.config['output_dir'] = os.path.join(dir, name)
-        self.config['news_vec_pool_path'] = os.path.join(dir, 'news_vec_pool.pkl')
-        self.config['user_to_news_pos_vec_path'] = os.path.join(self.config['output_dir'], 'user_to_news_pos_vec.pkl')
-        self.config['user_to_news_neg_vec_path'] = os.path.join(self.config['output_dir'], 'user_to_news_neg_vec.pkl')
-        self.config['user_to_news_pos_id_path'] = os.path.join(self.config['output_dir'], 'user_to_news_pos_id.pkl')
-        self.config['user_to_news_neg_id_path'] = os.path.join(self.config['output_dir'], 'user_to_news_neg_id.pkl')
-        self.config['user_model_path'] = os.path.join(self.config['output_dir'], 'user_model.pkl')
-        self.config['user_vec_pool_path'] = os.path.join(self.config['output_dir'], 'user_vec_pool.pkl')
-
-
+    def __init__(self, Config = None):
         self.logging = logging.getLogger(name=__name__)
         self.predict_model = None
         self.user_to_news_history  = None
@@ -43,6 +29,18 @@ class UserModel:
         self.user_to_news_neg_id  = None
         self.user_to_vec = None
         self.news_vec_dict = None
+        self.config = {}
+
+        if Config != None:
+            self.name = Config.model_name
+            self.config['output_dir'] = Config.Directory.model_dir
+            self.config['user_to_news_pos_id_path']  = Config.Preprocessor.user_to_news_pos_id_path
+            self.config['user_to_news_neg_id_path']  = Config.Preprocessor.user_to_news_neg_id_path
+            self.config['user_to_news_pos_vec_path'] = Config.Preprocessor.user_to_news_pos_vec_path
+            self.config['user_to_news_neg_vec_path'] = Config.Preprocessor.user_to_news_neg_vec_path
+            self.config['news_vec_pool_path'] = Config.Pool.news_vec_pool_path
+            self.config['user_vec_pool_path'] = Config.Pool.user_vec_pool_path
+            self.config['user_model_path'] = Config.Preprocessor.user_model_path
 
     def load_news_history(self, pos_path=None, neg_path=None, by_id=False):
         user_size = 0
