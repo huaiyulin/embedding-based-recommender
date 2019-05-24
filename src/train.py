@@ -7,7 +7,7 @@ import random
 from preprocessor import Preprocessor
 from user_model import UserModel
 from recommender import Recommender
-from data.config import Config
+from config import Config
 data_source_dir = Config.Directory.data_dir
 news_train_paths = Config.TrainingEvent.file_paths
 news_candidates_paths = Config.CandidateEvent.file_paths
