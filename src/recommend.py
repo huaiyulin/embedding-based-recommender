@@ -4,7 +4,7 @@ from annoy import AnnoyIndex
 from recommender import Recommender
 import pandas as pd
 import random
-from data.config import Config
+from config import Config
 
 def logging_setup():
     logging.basicConfig(
@@ -19,6 +19,7 @@ if __name__ == '__main__':
 
 	recommender = Recommender(Config=Config)
 	recommender.load_vec_pool()
+	recommender.load_news_history()
 	
 
 	while True:

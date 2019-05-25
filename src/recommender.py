@@ -21,6 +21,7 @@ class Recommender:
         self.candidate_pool = None
         self.user_vec_pool = None
         self.news_vec_pool = None
+        self.user_to_news_pos_id  = None
         self.user_ranking_list = None
         self.news_ranking_list = None
         self.annoy_indexer = None
@@ -32,11 +33,21 @@ class Recommender:
             self.config['candidate_pool_path'] = Config.Pool.candidate_pool_path
             self.config['user_vec_pool_path'] = Config.Pool.user_vec_pool_path
             self.config['news_vec_pool_path'] = Config.Pool.news_vec_pool_path
+            self.config['user_to_news_pos_id_path']  = Config.Preprocessor.user_to_news_pos_id_path
             self.config['user_ranking_list_path'] = os.path.join(self.config['output_dir'], 'user_ranking_list.pkl')
             self.config['news_ranking_list_path'] = os.path.join(self.config['output_dir'], 'news_ranking_list.pkl')
             self.config['annoy_indexer_path'] = Config.Recommender.annoy_indexer_path
 
 
+
+    def load_news_history(self, pos_path=None):
+        if not pos_path:
+            pos_path=self.config['user_to_news_pos_id_path']
+        self.logging.info('loading reading history...')
+        with open(pos_path, 'rb') as fp:
+            self.user_to_news_pos_id = pickle.load(fp)
+            user_size = len(self.user_to_news_pos_id)
+        self.logging.info('- complete loading reading history...')
 
 
     def load_vec_pool(self, news_vec_pool_path=None, user_vec_pool_path=None,candidate_pool=None):
@@ -148,8 +159,9 @@ class Recommender:
 
     def get_ranking_list_by_both(self,user_id,news_id, realtime=True, items=20):
         ranking_list = None
-        r_list_n = self.get_ranking_list_by_news_id(news_id, realtime=realtime, items=items*2)
-        r_list_u = self.get_ranking_list_by_user_id(user_id, realtime=realtime, items=items*2)
+        items_ = items*3
+        r_list_n = self.get_ranking_list_by_news_id(news_id, realtime=realtime, items=items_)
+        r_list_u = self.get_ranking_list_by_user_id(user_id, realtime=realtime, items=items_)
         r_ids    = list(set(r_list_u+r_list_n))
         r_scores = [0]*len(r_ids)
         if len(r_ids) == 0:
@@ -157,11 +169,15 @@ class Recommender:
         for i, r_id in enumerate(r_ids):
             if r_id in r_list_n:
                 r = r_list_n.index(r_id)
-                r_scores[i] += (items*2-r)
+                r_scores[i] += (items_-r)
             if r_id in r_list_u:
                 r = r_list_u.index(r_id)
-                r_scores[i] += (items*2-r)
+                r_scores[i] += (items_-r)
         r_scores, r_ids = zip(*sorted(zip(r_scores, r_ids), reverse=True))
+        if self.user_to_news_pos_id != None:
+            if user_id in self.user_to_news_pos_id:
+                history_list = self.user_to_news_pos_id[user_id]
+                r_ids = [ r_id for r_id in r_ids if r_id not in history_list]
         return r_ids[:items]
 
 
