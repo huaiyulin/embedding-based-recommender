@@ -5,6 +5,7 @@ import tensorflow as tf
 from keras.models import Model, load_model
 from keras.layers import Dense, LSTM, GRU
 from keras.layers import Embedding
+from keras.preprocessing.sequence import pad_sequences
 from keras.layers import TimeDistributed, RepeatVector, Input, subtract, Lambda
 from keras import backend as K
 from keras.callbacks import EarlyStopping
@@ -22,6 +23,7 @@ class UserModel:
     def __init__(self, Config = None):
         self.logging = logging.getLogger(name=__name__)
         self.predict_model = None
+        self.vec_type_model = None
         self.user_to_news_history  = None
         self.user_to_news_pos_vec  = None
         self.user_to_news_neg_vec  = None
@@ -122,21 +124,17 @@ class UserModel:
             neg_list = neg_item_list[user_id]
             if len(pos_list) >= N and len(neg_list) >= N:
                 user_list.append(user_id)
-                x_pos.append(pos_list[start:start+items][::-1])
-                x_neg.append(neg_list[start:start+items][::-1])
+                pos_list = pos_list[-(start+items):]
+                neg_list = neg_list[-(start+items):]
+                if start > 0:
+                    pos_list = pos_list[:-start]
+                    neg_list = neg_list[:-start]
+                x_pos.append(pos_list)
+                x_neg.append(neg_list)
         self.logging.info('- qualified users: {}'.format(len(user_list)))
         self.logging.info('- complete building news vectors list')
 
         return user_list,x_pos,x_neg
-
-    def cos_sim(self, a, b):
-        """Takes 2 vectors a, b and returns the cosine similarity according 
-        to the definition of the dot product
-        """
-        dot_product = np.dot(a, b)
-        norm_a = np.linalg.norm(a)
-        norm_b = np.linalg.norm(b)
-        return dot_product / (norm_a * norm_b)
 
     def l2_norm(self, x, axis=None):
         square_sum = K.sum(K.square(x), axis=axis, keepdims=True)
@@ -165,6 +163,7 @@ class UserModel:
         # update "embedding_matrix"
         self.logging.info('updating embedding layer...')
         self.predict_model.layers[1].set_weights([self.news_vec_dict])
+        self.predict_model.compile(loss='mse', optimizer="adam")
         self.logging.info(' - completed updating embedding_layer!')
 
     def _build_many_to_one_dict_model(self, shape, user_length=None, model_type='GRU', init_rnn_by_avg=False, neg_sampling=False, embedding_matrix=None):
@@ -225,8 +224,38 @@ class UserModel:
         self.logging.info(model.summary())
         return model
 
+    def _build_vec_type_model(self, base_model=None):
+        if base_model == None:
+            base_model = self.predict_model
+        
+        input_layer_name    = 'input_user'
+        rnn_layer_name      = 'rnn'
+        rnn_weight          = base_model.get_layer(rnn_layer_name).get_weights()
+        user_vec_layer_name = 'user_vec'
+        user_vec_weight     = base_model.get_layer(user_vec_layer_name).get_weights()
+        
+        shape = base_model.get_layer(rnn_layer_name).input_shape
+        user_length=shape[1]
+        news_dim = shape[2]
+        
+        input_user = Input(shape=(user_length,news_dim,), name=input_layer_name)
+        if base_model.get_layer(rnn_layer_name).__class__.__name__ == 'GRU':
+            rnn = GRU(units=news_dim, 
+                      input_shape=(user_length,news_dim), 
+                      name=rnn_layer_name, 
+                      weights=rnn_weight)(inputs=input_user)
+        else:
+            rnn = LSTM(units=news_dim,
+                       input_shape=(user_length,news_dim),
+                       name=rnn_layer_name,
+                       weights=rnn_weight)(inputs=input_user)        
+        user_vec = Dense(news_dim, name=user_vec_layer_name, weights=user_vec_weight)(rnn)
 
-
+        model  = Model(inputs=[input_user], outputs=user_vec)
+        model.compile(loss='mse', optimizer="adam")
+        self.vec_type_model = model
+        return model
+    
     def _build_many_to_one_model(self, shape, user_length=None, model_type='GRU', init_rnn_by_avg=False, neg_sampling=False):
         self.logging.info('******** model setting *********')
         self.logging.info('*****')
@@ -295,9 +324,13 @@ class UserModel:
         # 需要的是模型訓練時的中間產物，user_vec，將 user_vec 層讀出
         layer_name = 'user_vec'
         user_vec_model = Model(inputs=model.input, outputs=model.get_layer(layer_name).output)
+        
         self.predict_model = user_vec_model
+        self.predict_model.compile(loss='mse', optimizer="adam")
         self.save_user_model()
         self.load_user_model()
+        self._build_vec_type_model()
+        
         x_user  = x_pos[:,-user_length:]
         x_train = [x_user]
         user_vec_output = self.predict_model.predict(x_train)
@@ -330,6 +363,7 @@ class UserModel:
         layer_name = 'user_vec'
         user_vec_model = Model(inputs=model.input, outputs=model.get_layer(layer_name).output)
         self.predict_model = user_vec_model
+        self.predict_model.compile(loss='mse', optimizer="adam")
         self.save_user_model()
         self.load_user_model()
         x_user  = x_pos[:,-user_length:,:]
@@ -364,7 +398,7 @@ class UserModel:
             pos_list = dic[user_id]
             if len(pos_list) >= items:
                 user_list.append(user_id)
-                x_pos.append(pos_list[:items][::-1])
+                x_pos.append(pos_list[-items:])
         self.logging.info('- qualified users: {}'.format(len(user_list)))
         x_pos = np.asarray(x_pos)
         user_vec_output = self.predict_model.predict([x_pos])
@@ -394,11 +428,54 @@ class UserModel:
         if not path:
             path = self.config['user_model_path']
         self.predict_model = load_model(path)
+        self._build_vec_type_model()
         self.logging.info('- complete loading user-model from "{}"'.format(path))
 
-    def build_user_vec(self, news_vecs):
+    def predict(self, inputs, by_id=True):
+        """
+        ** need to user self.load_user_model() first
+        input:
+            news_ids: 2D list
+        """
         self.logging.info('building user-vec...')
+        max_length = 10
+        if by_id==True:
+            inputs = pad_sequences(inputs,
+                                   maxlen=max_length,
+                                   dtype='int32',
+                                   padding='pre',
+                                   truncating='pre',
+                                   value=0)
+            x_user = np.asarray(inputs,dtype='int32')
+            user_vec_output = self.predict_model.predict([x_user])
+        else:
+            x_user = []
+            for news_list in inputs:
+                temp_list = np.zeros((10,100))
+                if len(news_list) < max_length:
+                    temp_list[-len(news_list):,:] = np.asarray(news_list)
+                else:
+                    temp_list = np.asarray(news_list[-max_length:])
+                x_user.append(temp_list)
+            x_user = np.asarray(x_user)
+            user_vec_output = self.vec_type_model.predict([x_user])
+        self.logging.info('- complete building user-vec by news_ids...')
+        return user_vec_output
+
+    def build_user_vec_by_vec(self, news_vecs):
+        self.logging.info('building user-vec by news_vecs...')
         news_vecs = np.asarray(news_vecs)
         user_vec_output = self.predict_model.predict([news_vecs])
-        self.logging.info('- complete building user-vec...')
+
+        x_user  = x_pos[:,-user_length:]
+        x_train = [x_user]
+        user_vec_output = self.predict_model.predict(x_train)
+        # 將訓練得到的 user_vec 存起來
+        user_dic = {}
+        for i in range(len(user_vec_output)):
+            user_dic[user_list[i]] = user_vec_output[i]
+        self.user_to_vec = user_dic
+
+
+        self.logging.info('- complete building user-vec by news_vecs...')
         return user_vec_output

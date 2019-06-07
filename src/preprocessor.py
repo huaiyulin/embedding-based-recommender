@@ -23,7 +23,7 @@ class Preprocessor:
         self.events_for_candidates = None
         self.candidate_pool = None
         self.sampling_pool = None
-        self.user_to_news_history = None
+        self.user_to_news_history = {}
         self.news_vec_pool = None
         self.user_to_news_pos_id  = None
         self.user_to_news_neg_id  = None
@@ -35,11 +35,14 @@ class Preprocessor:
             self.name = Config.model_name
             self.config['output_dir'] = Config.Directory.model_dir
             self.config['user_to_news_list_path']    = Config.Preprocessor.user_to_news_history_path
-            self.config['candidate_pool_path']      = Config.Pool.candidate_pool_path
+            self.config['candidate_pool_path']       = Config.Pool.candidate_pool_path
             self.config['user_to_news_pos_id_path']  = Config.Preprocessor.user_to_news_pos_id_path
             self.config['user_to_news_neg_id_path']  = Config.Preprocessor.user_to_news_neg_id_path
             self.config['user_to_news_pos_vec_path'] = Config.Preprocessor.user_to_news_pos_vec_path
             self.config['user_to_news_neg_vec_path'] = Config.Preprocessor.user_to_news_neg_vec_path
+            self.config['news_vec_pool_path']        = Config.Pool.news_vec_pool_path
+            self.config['news_train_paths']          = Config.TrainingEvent.file_paths
+            self.config['news_candidates_paths']     = Config.CandidateEvent.file_paths
             self.news_id = Config.ColumnName.news_id
             self.user_id = Config.ColumnName.user_id
             self.event_time = Config.ColumnName.event_time
@@ -49,12 +52,16 @@ class Preprocessor:
             self.logging.warning('You don\'t set the Config, so all paths of this preprocessor are nil!')
 
         
-    def load_news_vec_pool(self, news_vec_pool_path):
+    def load_news_vec_pool(self, news_vec_pool_path=None):
+        if news_vec_pool_path == None:
+            news_vec_pool_path = self.config['news_vec_pool_path']
         self.news_vec_pool = pd.read_pickle(news_vec_pool_path)
 
-    def load_datas_for_user_model(self, news_paths):
+    def load_datas_for_user_model(self, news_paths=None):
+        if news_paths == None:
+            news_paths = self.config['news_train_paths']
         dfs = []
-        for news_path in news_paths:
+        for news_path in news_paths[::-1]:
             try:
                 df = pd.read_pickle(news_path)
                 dfs.append(df)
@@ -63,7 +70,9 @@ class Preprocessor:
                 continue
         self.events_for_training = pd.concat(dfs,ignore_index=True)
 
-    def load_datas_for_candidate_pool(self, news_paths):
+    def load_datas_for_candidate_pool(self, news_paths=None):
+        if news_paths == None:
+            news_paths = self.config['news_candidates_paths']
         dfs = []
         for news_path in news_paths:
             try:
@@ -85,7 +94,7 @@ class Preprocessor:
         self.logging.info('building user_to_news_list...')
         df = self._clean_data(self.events_for_training)
         self.logging.info('- sorting events...')
-        df = df.sort_values(by=self.event_time,ascending=False) # 將點擊事件由新到舊排序
+        df = df.sort_values(by=self.event_time,ascending=True) # 將點擊事件由舊到新排序
         self.logging.info('- grouping news_id by user_id...')
         df_group_by_user_id = df.groupby(self.user_id)
         self.logging.info('- convert news history into dictionary...')
@@ -103,7 +112,7 @@ class Preprocessor:
         u_list,n_list = self.custom_sort(df) # 將點擊事件由新到舊排序
         self.logging.info('- grouping news_id by user_id...')
         self.logging.info('- convert news history into dictionary...')
-        self.user_to_news_history = self.custom_group_by(u_list,n_list)
+        self.custom_group_by(u_list,n_list)
         # self.logging.info('- saving user_to_news_list...')
         # with open(self.config['user_to_news_list_path'], 'wb') as fp:
         #     pickle.dump(self.user_to_news_history,fp)
@@ -115,6 +124,7 @@ class Preprocessor:
         df = self._clean_data(self.events_for_candidates)
         news_count = df.groupby(self.news_id).size().reset_index().sort_values([0],ascending = False).reset_index()
         self.candidate_pool = news_count[(news_count.index < top) + (news_count[0] > at_least).values][self.news_id].tolist()
+        self.logging.info('- candidate_pool has {} items'.format(len(self.candidate_pool)))
         self.logging.info('- saving candidate_pool...')
         self.candidate_pool = {c_id:self.news_vec_pool[c_id] for c_id in self.candidate_pool if c_id in self.news_vec_pool}
         with open(self.config['candidate_pool_path'], 'wb') as fp:
@@ -208,7 +218,7 @@ class Preprocessor:
         self.logging.info('- complete saving user_to_news_neg_vec.')
 
     def custom_sort(self, df):
-        df = df.sort_values(by=self.event_time,ascending=False) # 將點擊事件由新到舊排序
+        df = df.sort_values(by=self.event_time,ascending=True) # 將點擊事件由舊到新排序
         n_list = df[self.news_id].tolist()
         u_list = df[self.user_id].tolist()
         # t_list = df[event_time].tolist()
@@ -216,10 +226,8 @@ class Preprocessor:
         return u_list,n_list
 
     def custom_group_by(self, u_list,n_list):
-        u_dic = {}
         for i, r in enumerate(u_list):
-            if r not in u_dic:
-                u_dic[u_list[i]] = [n_list[i]]
+            if r not in self.user_to_news_history:
+                self.user_to_news_history[u_list[i]] = [n_list[i]]
             else:
-                u_dic[u_list[i]].append(n_list[i])
-        return u_dic
+                self.user_to_news_history[u_list[i]].append(n_list[i])

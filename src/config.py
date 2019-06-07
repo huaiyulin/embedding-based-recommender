@@ -1,33 +1,55 @@
 import os
-class ColumnName:
-    event_time = 'user_id'
-    news_id    = 'event_time'
-    user_id    = 'news_id'
-    columns    = [event_time,news_id,user_id]
+from datetime import datetime, timedelta
+import json
+import argparse
+
+with open('training_config.json','r') as reader:
+    training_config = json.loads(reader.read())
+
+begin_t = training_config['training_event']['begin']
+end_t = training_config['training_event']['end']
+
+begin_c = training_config['candidate_event']['begin']
+end_c = training_config['candidate_event']['end']
+
+news_meta_path = os.path.join('../data',training_config['news_meta_name'])
+
+
+def get_event_date(begin_day,end_day):
+    bd = begin_day.split(',') 
+    bd = [int(x) for x in bd]
+    ed = end_day.split(',') 
+    ed = [int(x) for x in ed]
+    begin_date = datetime(bd[0],bd[1],bd[2]).date()
+    end_date = datetime(ed[0],ed[1],ed[2]).date()
+    eventdate = []
+    a_day = timedelta(days=1)
+    while begin_date <= end_date:
+        eventdate.append('event-' + str(begin_date) + '.pkl')
+        begin_date += a_day
+    return eventdate
 
 class TrainingEvent:
-    _start  = '0430'
-    _end    = '0501' # not included
-    _prefix = 'event-2019'
-    file_names = []
-    for x in range(int(_start),int(_end)):
-        file_name = _prefix + str(x).zfill(4) + '.pkl'
-        file_names.append(file_name)
+    bd = begin_t.split(',') 
+    ed = end_t.split(',') 
+    _start = bd[1].zfill(2)+bd[2].zfill(2)
+    _end = ed[1].zfill(2)+ed[2].zfill(2)
+    file_names = get_event_date(begin_t,end_t)
     file_paths = None
 
 class CandidateEvent:
-    _start  = '0428'
-    _end    = '0429' # not included
-    _prefix = 'event-2019'
-    file_names = []
-    for x in range(int(_start),int(_end)):
-        file_name = _prefix + str(x).zfill(4) + '.pkl'
-        file_names.append(file_name)
+    file_names = get_event_date(begin_c,end_c)
     file_paths = None
+
+class ColumnName:
+    event_time = 'event_time'
+    news_id    = 'news_id'
+    user_id    = 'user_id'
+    columns    = [event_time,news_id,user_id]
 
 class Directory:
     model_name  = "{}-{}".format(TrainingEvent._start,TrainingEvent._end)
-    data_dir     = 'data'
+    data_dir     = '../data'
     vec_pool_dir = data_dir
     model_dir    = os.path.join(data_dir,model_name)
 
@@ -78,3 +100,51 @@ class Config:
     Recommender  = Recommender
     CandidateEvent.file_paths = [os.path.join(Directory.data_dir,file_name) for file_name in CandidateEvent.file_names]
     TrainingEvent.file_paths  = [os.path.join(Directory.data_dir,file_name) for file_name in TrainingEvent.file_names]
+
+
+
+def get_parser():
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument("-t_b", dest="training_begin", type=str, help="event begin day, ex. 2019,4,28")
+    parser.add_argument("-t_e", dest="training_end", type=str, help="event end day, ex. 2019,4,29")
+    parser.add_argument("-c_b", dest="candidate_begin", type=str, help="candidate begin day, ex. 2019,4,29")
+    parser.add_argument("-c_e", dest="candidate_end", type=str, help="candidate end day, ex. 2019,4,30")
+    parser.add_argument("-meta_name", dest="news_meta_name", type=str, help="news meta path, ex. news_meta_2019-05-01.json")
+    return parser
+
+def read_json():
+    with open('training_config.json','r') as reader:
+        training_config = json.loads(reader.read())
+    return training_config
+
+def save_json(file_to_save):
+    with open('training_config.json','w') as output_path:
+        json.dump(file_to_save,output_path)
+
+
+def main(args=None):
+    parser = get_parser()
+    args = parser.parse_args(args)
+    training_begin = args.training_begin
+    training_end = args.training_end
+    candidate_begin = args.candidate_begin
+    candidate_end = args.candidate_end
+    news_meta_name = args.news_meta_name
+
+    training_config = read_json()
+
+    if training_begin:
+        training_config['training_event']['begin'] = training_begin
+    if training_end:
+        training_config['training_event']['end'] = training_end
+    if candidate_begin:
+        training_config['candidate_event']['begin'] = candidate_begin
+    if candidate_end:
+        training_config['candidate_event']['end'] = candidate_end
+    if news_meta_name:
+        training_config['news_meta_name'] = news_meta_name
+
+    save_json(training_config)
+
+if __name__ == '__main__':
+    main()

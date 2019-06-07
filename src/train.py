@@ -8,10 +8,7 @@ from preprocessor import Preprocessor
 from user_model import UserModel
 from recommender import Recommender
 from config import Config
-data_source_dir = Config.Directory.data_dir
-news_train_paths = Config.TrainingEvent.file_paths
-news_candidates_paths = Config.CandidateEvent.file_paths
-news_vec_pool_path = Config.Pool.news_vec_pool_path
+
 
 def logging_setup():
     logging.basicConfig(
@@ -24,25 +21,25 @@ if __name__ == '__main__':
     logging.info('=============== START RUNNING ===============')
 
     preprocessor = Preprocessor(Config=Config)
-    preprocessor.load_news_vec_pool(news_vec_pool_path)
-    preprocessor.load_datas_for_user_model(news_train_paths)
+    preprocessor.load_news_vec_pool()
+    preprocessor.load_datas_for_user_model()
     preprocessor.build_user_to_news_history_custom()
     preprocessor.build_sampling_pool(top = 5000, at_least = 10)
-    preprocessor.build_id_pairs_from_history(at_least=10)
+    preprocessor.build_id_pairs_from_history(at_least=3)
     # preprocessor.build_vec_pairs_from_history(at_least=10)
-    preprocessor.load_datas_for_candidate_pool(news_candidates_paths)
-    preprocessor.build_candidate_pool(top = 5000, at_least = 10)
+    preprocessor.load_datas_for_candidate_pool()
+    preprocessor.build_candidate_pool(top = 2000, at_least = 100)
 
     user_model = UserModel(Config=Config)
     user_model.load_news_history(by_id=True)
     user_model.model_training_dict_version(start=0,
                                           items=10,
                                           N=10,
-                                          epochs=1, 
+                                          epochs=20, 
                                           batch_size=256, 
                                           model_type='GRU', 
                                           init_rnn_by_avg=False)
-                
+
     recommender = Recommender(Config=Config)
     recommender.load_vec_pool()
     recommender.build_annoy_indexer()
